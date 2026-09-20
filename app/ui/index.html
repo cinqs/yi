@@ -1,0 +1,1058 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>驿</title>
+<link rel="icon" href="/icon.png">
+<!-- 后端会把当前状态内联到这里：首屏直接是真实数据，不用等第一次 fetch -->
+<script id="boot" type="application/json">null</script>
+<style>
+  /* ---------------------------------------------------------------
+     设计令牌
+     颜色只在这一层定义；组件里不出现裸色值，改主题只动这里。
+     --------------------------------------------------------------- */
+  :root {
+    /* 层次：越靠近内容的越亮，靠"表面明度"而不是描边来分层 */
+    --bg:        #0a0c11;
+    --surface:   #12151d;
+    --surface-2: #171b25;
+    --surface-3: #1e2330;
+    --line:      #242a36;
+    --line-soft: #1c222c;
+
+    --text:      #eef1f6;
+    --text-dim:  #8b93a3;
+    --text-faint:#5c6474;
+
+    --brand:     #3ddc97;   /* 与 App 图标同色 */
+    --brand-dim: #1f8f63;
+    --info:      #5b8cff;
+    --warn:      #f2b544;
+    --danger:    #ff6b6b;
+
+    --r-lg: 16px;
+    --r-md: 11px;
+    --r-sm: 8px;
+
+    --shadow-card: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    --shadow-pop:  0 18px 50px -12px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 50% -20%, rgba(61,220,151,.055), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font: 14px/1.6 -apple-system, "PingFang SC", "SF Pro Text", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 22px 24px 48px; }
+
+  /* 微标签：小号、拉开字距、降低对比 —— 让"值"自然成为主角 */
+  .micro { font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+           color: var(--text-faint); font-weight: 600; }
+
+  /* ---------------------------------------------------------------
+     顶栏
+     --------------------------------------------------------------- */
+  header { display: flex; align-items: center; gap: 11px; margin-bottom: 20px; }
+  header img { width: 30px; height: 30px; border-radius: 9px;
+               box-shadow: 0 2px 10px rgba(0,0,0,.5); }
+  header h1 { font-size: 15px; font-weight: 650; letter-spacing: -.01em; margin: 0; }
+  .spacer { flex: 1; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px 4px 8px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    font-size: 12px; color: var(--text-dim);
+    transition: color .25s, border-color .25s, background .25s;
+  }
+  .pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint);
+            transition: background .25s, box-shadow .25s; }
+  .pill.ok    { color: #a9f0cf; border-color: rgba(61,220,151,.35); background: rgba(61,220,151,.10); }
+  .pill.ok i  { background: var(--brand); box-shadow: 0 0 8px var(--brand); }
+  .pill.busy  { color: #cfe0ff; border-color: rgba(91,140,255,.35); background: rgba(91,140,255,.10); }
+  .pill.busy i{ background: var(--info); box-shadow: 0 0 8px var(--info); animation: breathe 1.4s ease-in-out infinite; }
+  .pill.warn  { color: #ffe0ae; border-color: rgba(242,181,68,.35); background: rgba(242,181,68,.10); }
+  .pill.warn i{ background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  @keyframes breathe { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+  .ver { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-faint); }
+
+  /* ---------------------------------------------------------------
+     分段控件（比一排按钮更像"导航"）
+     --------------------------------------------------------------- */
+  nav {
+    display: inline-flex; gap: 2px; padding: 3px; margin-bottom: 20px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px;
+  }
+  nav button {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    padding: 7px 18px; border-radius: 999px; font-size: 13px; font-weight: 550;
+    color: var(--text-dim); transition: color .18s, background .22s;
+  }
+  nav button:hover { color: var(--text); }
+  nav button.active { background: var(--surface-3); color: var(--text);
+                      box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+
+  /* ---------------------------------------------------------------
+     卡片
+     --------------------------------------------------------------- */
+  .card {
+    position: relative;
+    background: linear-gradient(180deg, rgba(255,255,255,.022), rgba(255,255,255,0) 40%), var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    padding: 20px;
+    box-shadow: var(--shadow-card);
+  }
+  .card + .card { margin-top: 14px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  .grid > .card { margin-top: 0; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  .card > .micro { display: block; margin-bottom: 14px; }
+
+  /* 键值行：值右对齐、数字等宽，扫读时对齐 */
+  .row { display: flex; align-items: baseline; justify-content: space-between;
+         gap: 16px; padding: 7px 0; }
+  .row + .row { border-top: 1px solid var(--line-soft); }
+  .row .k { color: var(--text-dim); font-size: 12.5px; }
+  .row .v { color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums;
+            text-align: right; word-break: break-all; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* ---------------------------------------------------------------
+     状态光环：整个界面的主角
+     --------------------------------------------------------------- */
+  .hero { text-align: center; padding: 6px 0 2px; }
+  .orb { position: relative; width: 132px; height: 132px; margin: 0 auto 14px; }
+  .orb svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .orb .ring { fill: none; stroke: var(--line); stroke-width: 2; }
+  .orb .arc  { fill: none; stroke: var(--brand); stroke-width: 2.5; stroke-linecap: round;
+               stroke-dasharray: 300; stroke-dashoffset: 300;
+               transition: stroke-dashoffset .9s cubic-bezier(.22,1,.36,1), stroke .4s; }
+  .orb .halo { fill: none; stroke: var(--brand); stroke-width: 1; opacity: 0; }
+  .orb.on .halo { animation: halo 2.6s ease-out infinite; }
+  @keyframes halo { 0% { opacity: .35; r: 54 } 100% { opacity: 0; r: 66 } }
+  .orb .glyph { stroke: var(--text-dim); fill: none; stroke-width: 1.6;
+                stroke-linecap: round; stroke-linejoin: round; transition: stroke .35s; }
+  .orb.on .glyph { stroke: var(--brand); }
+  .orb .glyph path { transition: opacity .25s; }
+  .orb.busy .arc { animation: sweep 1.5s linear infinite; }
+  @keyframes sweep {
+    0%   { stroke-dashoffset: 300; }
+    50%  { stroke-dashoffset: 90; }
+    100% { stroke-dashoffset: -120; }
+  }
+  .state { font-size: 27px; font-weight: 680; letter-spacing: -.02em; line-height: 1.15;
+           transition: color .35s; }
+  .substate { color: var(--text-dim); font-size: 13px; margin-top: 5px; min-height: 20px;
+              transition: color .3s; }
+  .substate .hl { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  /* ---------------------------------------------------------------
+     按钮
+     --------------------------------------------------------------- */
+  .actions { display: flex; gap: 8px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+  button.btn {
+    appearance: none; cursor: pointer; font: 550 13px/1 inherit;
+    padding: 10px 16px; border-radius: var(--r-md);
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: background .16s, border-color .16s, transform .1s, opacity .16s;
+  }
+  button.btn:hover:not(:disabled) { background: var(--surface-3); border-color: #2d3442; }
+  button.btn:active:not(:disabled) { transform: translateY(1px); }
+  button.btn:disabled { opacity: .45; cursor: default; }
+  button.btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none;
+                   stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  button.btn.primary {
+    background: linear-gradient(180deg, #46e6a3, var(--brand)); color: #06231a;
+    border-color: rgba(0,0,0,.25); font-weight: 650; width: 100%;
+    justify-content: center; padding: 14px; font-size: 14.5px; border-radius: 13px;
+    box-shadow: 0 8px 22px -10px rgba(61,220,151,.7), inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  /* 主按钮的悬停/按下必须**自己声明**：通用规则 `button.btn:hover:not(:disabled)`
+     权重比 `button.btn.primary` 高（多一个 :not 伪类），会把绿色渐变盖成深灰——
+     表现就是"悬停后按钮变灰、底部还留着一道绿光"（用户截图报过）。 */
+  button.btn.primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #55f0ae, #3ee6a0);
+    border-color: rgba(0,0,0,.25);
+  }
+  button.btn.primary:active:not(:disabled) {
+    background: linear-gradient(180deg, #3ddc97, #35cd8c);
+  }
+  button.btn.primary.off {
+    background: var(--surface-3); color: var(--text); border-color: var(--line);
+    box-shadow: none; font-weight: 550;
+  }
+  button.btn.primary.off:hover:not(:disabled) { background: var(--surface-3); filter: brightness(1.15); }
+  button.btn.danger { color: #ffb3b3; border-color: rgba(255,107,107,.28); }
+  button.btn.danger:hover:not(:disabled) { background: rgba(255,107,107,.12); }
+  .spin { width: 13px; height: 13px; border-radius: 50%;
+          border: 2px solid rgba(0,0,0,.25); border-top-color: currentColor;
+          animation: rot .7s linear infinite; }
+  @keyframes rot { to { transform: rotate(360deg) } }
+
+  /* ---------------------------------------------------------------
+     进度
+     --------------------------------------------------------------- */
+  .bar { height: 3px; border-radius: 3px; background: var(--surface-3);
+         overflow: hidden; margin: 18px 0 2px; }
+  .bar > div { height: 100%; width: 0; border-radius: 3px;
+               background: linear-gradient(90deg, var(--brand-dim), var(--brand));
+               transition: width .55s cubic-bezier(.22,1,.36,1); }
+  .steps { list-style: none; margin: 0; padding: 0; }
+  .steps li { display: flex; align-items: center; gap: 10px; padding: 6px 0;
+              color: var(--text-faint); font-size: 13px; transition: color .3s; }
+  .steps li .mark { width: 15px; height: 15px; flex: none; }
+  .steps li .mark svg { width: 15px; height: 15px; fill: none; stroke: currentColor;
+                        stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .steps li.done { color: var(--text-dim); }
+  .steps li.done .mark { color: var(--brand); }
+  .steps li.active { color: var(--text); font-weight: 600; }
+  .steps li.active .mark { color: var(--info); animation: breathe 1.2s ease-in-out infinite; }
+
+  /* ---------------------------------------------------------------
+     开关
+     --------------------------------------------------------------- */
+  .switch { display: flex; align-items: center; gap: 12px; padding: 9px 0; cursor: pointer; }
+  .switch:hover .label { color: var(--text); }
+  .switch:hover .track { border-color: #3a4252; }
+  .switch:active .track > i { transform: scale(.9); }
+  .switch.on:active .track > i { transform: translateX(14px) scale(.9); }
+  .switch + .switch { border-top: 1px solid var(--line-soft); }
+  .switch .track { width: 34px; height: 20px; border-radius: 999px; flex: none;
+                   background: var(--surface-3); border: 1px solid var(--line);
+                   position: relative; transition: background .22s, border-color .22s; }
+  .switch .track > i { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+                       border-radius: 50%; background: #6b7280;
+                       transition: transform .24s cubic-bezier(.22,1,.36,1), background .22s; }
+  .switch.on .track { background: rgba(61,220,151,.22); border-color: rgba(61,220,151,.5); }
+  .switch.on .track > i { transform: translateX(14px); background: var(--brand); }
+  .switch .label { flex: 1; font-size: 13px; }
+  .switch .hint { color: var(--text-faint); font-size: 11.5px; line-height: 1.45; }
+
+  /* ---------------------------------------------------------------
+     曲线
+     --------------------------------------------------------------- */
+  canvas.spark { display: block; width: 100%; height: 46px; margin: 2px 0 8px; }
+
+  /* ---------------------------------------------------------------
+     日志
+     --------------------------------------------------------------- */
+  #log { font: 11.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+         max-height: 200px; overflow: auto; }
+  #log div { padding: 1.5px 0; color: var(--text-faint); white-space: pre-wrap;
+             word-break: break-all; }
+  #log div.err { color: #ffb3b3; }
+  #log div.warn { color: #ffd894; }
+  #log time { color: #414855; margin-right: 7px; }
+
+  /* ---------------------------------------------------------------
+     表单
+     --------------------------------------------------------------- */
+  label.micro { display: block; margin: 14px 0 5px; }
+  .form { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
+  .form .field.wide { grid-column: 1 / -1; }
+  input[type=text], input[type=number] {
+    width: 100%; padding: 9px 12px; border-radius: var(--r-sm);
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+    font-size: 13px; transition: border-color .16s, box-shadow .16s;
+  }
+  input:focus { outline: none; border-color: rgba(91,140,255,.6);
+                box-shadow: 0 0 0 3px rgba(91,140,255,.13); }
+  input:hover:not(:focus) { border-color: #333b4a; }
+
+  /* ---------------------------------------------------------------
+     弹窗 / 提示
+     --------------------------------------------------------------- */
+  .overlay { position: fixed; inset: 0; background: rgba(6,8,12,.6);
+             backdrop-filter: blur(3px); display: flex; align-items: center;
+             justify-content: center; z-index: 50; }
+  .overlay.hide { display: none; }
+  .dialog { background: var(--surface-2); border: 1px solid var(--line);
+            border-radius: var(--r-lg); padding: 22px; width: 380px; max-width: 90vw;
+            box-shadow: var(--shadow-pop); animation: pop .18s cubic-bezier(.22,1,.36,1); }
+  @keyframes pop { from { opacity: 0; transform: scale(.97) translateY(4px) } }
+  .dialog h3 { margin: 0 0 8px; font-size: 15px; font-weight: 650; }
+  .dialog p { margin: 0 0 18px; color: var(--text-dim); font-size: 13px; white-space: pre-wrap; }
+  .dialog .buttons { display: flex; gap: 8px; justify-content: flex-end; }
+
+  #toasts { position: fixed; right: 20px; bottom: 20px; display: flex;
+            flex-direction: column; gap: 8px; z-index: 60; }
+  .toast { display: flex; align-items: center; gap: 9px;
+           background: rgba(23,27,37,.96); border: 1px solid var(--line);
+           color: var(--text); padding: 10px 14px; border-radius: var(--r-md);
+           font-size: 12.5px; box-shadow: var(--shadow-pop); max-width: 340px;
+           animation: toast-in .24s cubic-bezier(.22,1,.36,1); }
+  .toast svg { width: 15px; height: 15px; flex: none; stroke-width: 1.8; fill: none;
+               stroke-linecap: round; stroke-linejoin: round; }
+  .toast.ok svg { stroke: var(--brand); }
+  .toast.err svg { stroke: var(--danger); }
+  .toast.info svg { stroke: var(--info); }
+  .toast.out { animation: toast-out .2s forwards; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(10px) scale(.98) } }
+  @keyframes toast-out { to { opacity: 0; transform: translateY(6px) } }
+
+  .banner { display: flex; gap: 10px; align-items: flex-start;
+            border-radius: var(--r-md); padding: 11px 14px; margin-bottom: 14px;
+            border: 1px solid rgba(255,107,107,.28); background: rgba(255,107,107,.09);
+            color: #ffc4c4; font-size: 12.5px; }
+  .banner svg { width: 16px; height: 16px; flex: none; margin-top: 1px;
+                stroke: var(--danger); fill: none; stroke-width: 1.8;
+                stroke-linecap: round; stroke-linejoin: round; }
+
+  .hide { display: none; }
+  /* 骨架屏：第一次拿到状态前别闪一排 "—" */
+  body:not(.ready) .v {
+    color: transparent; border-radius: 5px; min-width: 64px;
+    background: linear-gradient(90deg, #1b202b 25%, #232937 50%, #1b202b 75%);
+    background-size: 200% 100%; animation: shimmer 1.4s linear infinite;
+  }
+  @keyframes shimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+  .fadein { animation: fade .3s ease-out; }
+  @keyframes fade { from { opacity: 0; transform: translateY(3px) } }
+</style>
+</head>
+<body>
+<!-- 图标集：全部自绘，24×24 网格、1.7 线宽，和整体风格统一（不用 emoji） -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-shield" viewBox="0 0 24 24">
+      <path d="M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6l7-3z"/>
+      <path d="M9.2 12.2l2 2 3.6-4"/>
+    </symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8.5"/>
+      <path d="M3.5 12h17M12 3.5c2.3 2.6 2.3 14.4 0 17M12 3.5c-2.3 2.6-2.3 14.4 0 17"/>
+    </symbol>
+    <symbol id="i-power" viewBox="0 0 24 24">
+      <path d="M12 3.5v8"/><path d="M6.8 6.6a8 8 0 1 0 10.4 0"/>
+    </symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24">
+      <path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4.5V10h-5.5"/>
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24">
+      <path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l.9 12.2h9.2L17.5 7"/>
+      <path d="M10.5 10.5v5.5M13.5 10.5v5.5"/>
+    </symbol>
+    <symbol id="i-pulse" viewBox="0 0 24 24">
+      <path d="M3.5 12.5h4l2-6 3.5 12 2.5-7h5"/>
+    </symbol>
+    <symbol id="i-link" viewBox="0 0 24 24">
+      <path d="M10 14a4 4 0 0 0 5.7 0l3-3A4 4 0 0 0 13 5.4l-1.4 1.4"/>
+      <path d="M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.6l1.4-1.4"/>
+    </symbol>
+    <symbol id="i-server" viewBox="0 0 24 24">
+      <rect x="3.5" y="4.5" width="17" height="6.5" rx="2"/>
+      <rect x="3.5" y="13" width="17" height="6.5" rx="2"/>
+      <path d="M7 7.7h.01M7 16.2h.01"/>
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24">
+      <rect x="9" y="9" width="11" height="11" rx="2.2"/>
+      <path d="M15 6.6A2.6 2.6 0 0 0 12.4 4H6.6A2.6 2.6 0 0 0 4 6.6v5.8A2.6 2.6 0 0 0 6.6 15"/>
+    </symbol>
+    <symbol id="i-qr" viewBox="0 0 24 24">
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/>
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/>
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/>
+      <path d="M13.5 13.5h3v3h-3zM20 13.5v6.5h-3"/>
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24">
+      <path d="M12 4.5l8.5 15h-17L12 4.5z"/><path d="M12 10v4.2M12 17h.01"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+      <path d="M5 12.8l4.6 4.4L19 6.8"/>
+    </symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24">
+      <path d="M12 4.5v10M8 11l4 4 4-4M5 19.5h14"/>
+    </symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 3.5v2.2M12 18.3v2.2M4.9 7.8l1.9 1.1M17.2 15.1l1.9 1.1M4.9 16.2l1.9-1.1M17.2 8.9l1.9-1.1"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="overlay hide" id="overlay">
+  <div class="dialog">
+    <h3 id="dlg-title"></h3>
+    <p id="dlg-text"></p>
+    <div class="buttons" id="dlg-buttons"></div>
+  </div>
+</div>
+<div id="toasts"></div>
+
+<div class="wrap">
+  <header>
+    <img src="/icon.png" alt="" onerror="this.style.display='none'">
+    <h1>驿<span style="color:var(--text-faint);font-weight:400;margin-left:7px">Yi</span></h1>
+    <span class="spacer"></span>
+    <span class="pill" id="pill"><i></i><span id="pill-text">读取中</span></span>
+    <span class="ver" id="ver"></span>
+  </header>
+
+  <div class="banner hide" id="banner">
+    <svg><use href="#i-alert"/></svg><span id="banner-text"></span>
+  </div>
+
+  <nav>
+    <button data-tab="connect" class="active">连接</button>
+    <button data-tab="machine">机器</button>
+    <button data-tab="settings">设置</button>
+  </nav>
+
+  <section id="tab-connect">
+    <div class="card">
+      <div class="hero">
+        <div class="orb" id="orb">
+          <svg viewBox="0 0 120 120">
+            <circle class="halo" cx="60" cy="60" r="54"/>
+            <circle class="ring" cx="60" cy="60" r="46"/>
+            <circle class="arc" cx="60" cy="60" r="46"
+                    transform="rotate(-90 60 60)"
+                    stroke-dasharray="289" stroke-dashoffset="289"/>
+          </svg>
+          <svg viewBox="0 0 24 24"><g class="glyph" id="orb-glyph"><use href="#i-globe"/></g></svg>
+        </div>
+        <div class="state" id="hero-state">未连接</div>
+        <div class="substate" id="hero-sub">正在读取状态…</div>
+      </div>
+      <div class="bar hide" id="hero-bar"><div id="hero-bar-fill"></div></div>
+      <div style="margin-top:18px"><button class="btn primary" id="btn-connect" disabled>连接</button></div>
+      <div class="actions" id="connect-actions"></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <span class="micro">服务端</span>
+        <div class="row"><span class="k">地址</span><span class="v mono" id="srv-addr">—</span></div>
+        <div class="row"><span class="k">伪装目标</span><span class="v mono" id="srv-sni">—</span></div>
+        <div class="row"><span class="k">Xray</span><span class="v mono" id="srv-ver">—</span></div>
+        <div class="row"><span class="k">自检</span><span class="v" id="srv-test">—</span></div>
+        <div class="row"><span class="k">凭据</span><span class="v mono" id="srv-ident">—</span></div>
+      </div>
+
+      <div class="card">
+        <span class="micro">后台守护</span>
+        <div class="switch" id="sw-watch">
+          <div class="track"><i></i></div>
+          <div class="label">自动重建
+            <div class="hint" id="watch-hint">机器被回收后自动重买</div></div>
+        </div>
+        <div class="switch on" id="sw-reconcile">
+          <div class="track"><i></i></div>
+          <div class="label">状态自愈
+            <div class="hint">内核崩溃、代理被关、地址变化都会自动纠正</div></div>
+        </div>
+        <div class="row" style="margin-top:8px"><span class="k">内核</span><span class="v" id="conn-kernel">—</span></div>
+        <div class="row"><span class="k">系统代理</span><span class="v" id="conn-sysproxy">—</span></div>
+        <div class="row"><span class="k">本地端口</span><span class="v mono" id="conn-port">—</span></div>
+      </div>
+    </div>
+
+    <div class="card" id="panel-traffic">
+      <span class="micro">实时流量</span>
+      <canvas class="spark" id="spark" width="800" height="92"></canvas>
+      <div class="row"><span class="k">下载</span><span class="v mono" id="tr-down">—</span></div>
+      <div class="row"><span class="k">上传</span><span class="v mono" id="tr-up">—</span></div>
+      <div class="row"><span class="k">累计</span><span class="v mono" id="tr-total">—</span></div>
+      <div class="row"><span class="k">活动连接</span><span class="v mono" id="tr-conns">—</span></div>
+    </div>
+
+    <div class="card">
+      <span class="micro">手机订阅</span>
+      <div class="row"><span class="k">地址</span><span class="v mono" id="sub-url" style="font-size:11.5px">—</span></div>
+      <div class="actions" style="justify-content:flex-start;margin-top:14px">
+        <button class="btn" id="btn-copy-sub"><svg><use href="#i-copy"/></svg>复制地址</button>
+        <button class="btn" id="btn-show-qr"><svg><use href="#i-qr"/></svg>二维码</button>
+      </div>
+      <div id="qr-wrap" class="hide" style="text-align:center;margin-top:14px">
+        <img id="qr-img" alt="订阅二维码"
+             style="width:190px;height:190px;background:#fff;border-radius:12px;padding:7px">
+      </div>
+      <div class="hint" style="margin-top:12px;color:var(--text-faint);font-size:11.5px;line-height:1.6">
+        手机与这台电脑需在同一 Wi-Fi。v2rayNG → 订阅 → 添加订阅 → 粘贴此地址。
+        机器换 IP 时内容自动更新，手机端刷新订阅即可。
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-machine" class="hide">
+    <div class="card">
+      <div class="hero">
+        <div class="orb" id="m-orb">
+          <svg viewBox="0 0 120 120">
+            <circle class="ring" cx="60" cy="60" r="46"/>
+            <circle class="arc" cx="60" cy="60" r="46"
+                    transform="rotate(-90 60 60)"
+                    stroke-dasharray="289" stroke-dashoffset="289"/>
+          </svg>
+          <svg viewBox="0 0 24 24"><g class="glyph" id="m-orb-glyph"><use href="#i-server"/></g></svg>
+        </div>
+        <div class="state" id="m-state">未购买</div>
+        <div class="substate" id="m-sub">还没有机器</div>
+      </div>
+      <div class="bar hide" id="m-bar"><div id="m-bar-fill"></div></div>
+      <div style="margin-top:18px"><button class="btn primary" id="btn-provision">购买并安装</button></div>
+      <div class="actions">
+        <button class="btn" id="btn-selftest"><svg><use href="#i-pulse"/></svg>服务端自检</button>
+        <button class="btn danger" id="btn-destroy" disabled><svg><use href="#i-trash"/></svg>销毁机器</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <span class="micro">实例</span>
+        <div class="row"><span class="k">ID</span><span class="v mono" id="m-id">—</span></div>
+        <div class="row"><span class="k">公网 IP</span><span class="v mono" id="m-ip">—</span></div>
+        <div class="row"><span class="k">规格</span><span class="v" id="m-spec">—</span></div>
+        <div class="row"><span class="k">可用区</span><span class="v" id="m-zone">—</span></div>
+      </div>
+      <div class="card">
+        <span class="micro">计费</span>
+        <div class="row"><span class="k">模式</span><span class="v" id="m-bill">—</span></div>
+        <div class="row"><span class="k">出价上限</span><span class="v mono" id="m-price">—</span></div>
+        <div class="row"><span class="k">已运行</span><span class="v" id="m-hours">—</span></div>
+        <div class="row"><span class="k">预估花费</span><span class="v mono" id="m-cost">—</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="micro">安装进度</span>
+      <ol class="steps" id="steps"></ol>
+    </div>
+
+    <div class="card">
+      <span class="micro">后端日志</span>
+      <div id="log"></div>
+    </div>
+  </section>
+
+  <section id="tab-settings" class="hide">
+    <div class="card">
+      <span class="micro">购买参数</span>
+      <div class="form">
+        <div class="field wide">
+          <label class="micro">规格候选 · 逗号分隔，按顺序尝试</label>
+          <input type="text" id="cfg-types">
+        </div>
+        <div class="field wide">
+          <label class="micro">可用区</label>
+          <input type="text" id="cfg-zones">
+        </div>
+        <div class="field">
+          <label class="micro">出价倍数 · 市场价 × N</label>
+          <input type="number" id="cfg-mul" step="0.1" min="1">
+        </div>
+        <div class="field">
+          <label class="micro">服务端端口</label>
+          <input type="number" id="cfg-port">
+        </div>
+        <div class="field">
+          <label class="micro">Xray 版本</label>
+          <input type="text" id="cfg-xray">
+        </div>
+        <div class="field">
+          <label class="micro">月度流量上限 · GB</label>
+          <input type="number" id="cfg-gb" min="1">
+        </div>
+        <div class="field wide">
+          <label class="micro">伪装目标候选 · 按顺序自检，第一个通的会被采用</label>
+          <input type="text" id="cfg-dests">
+        </div>
+      </div>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="btn" id="btn-save"><svg><use href="#i-check"/></svg>保存</button>
+        <button class="btn" id="btn-reset-hint"><svg><use href="#i-refresh"/></svg>恢复推荐值</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ARC = 289;   // 光环周长（2πr，r=46）
+
+const STAGES = [
+  ["auth", "认证阿里云账号"], ["image", "选择系统镜像"],
+  ["network", "准备网络"], ["create", "创建竞价实例"],
+  ["boot", "启动实例"], ["ip", "分配公网 IP"],
+  ["install", "安装服务端"], ["ready", "服务端就绪"],
+];
+
+// 每个状态：文案、顶栏胶囊样式、光环里的图形
+const STATES = {
+  no_machine:     { label: "未连接",     sub: "还没有机器",           pill: "",     glyph: "i-globe" },
+  ready:          { label: "可以连接",   sub: "服务端已就绪",         pill: "warn", glyph: "i-shield" },
+  connecting:     { label: "正在连接",   sub: "启动内核并设置系统代理", pill: "busy", glyph: "i-power", busy: true },
+  connected:      { label: "已连接",     sub: "",                      pill: "ok",   glyph: "i-shield", on: true },
+  degraded:       { label: "连接异常",   sub: "内核在跑，出口不对",    pill: "warn", glyph: "i-alert" },
+  installing:     { label: "正在安装",   sub: "",                      pill: "busy", glyph: "i-server", busy: true },
+  install_failed: { label: "安装失败",   sub: "久未就绪，建议重建",    pill: "warn", glyph: "i-alert" },
+  reclaimed:      { label: "机器已被回收", sub: "守护会自动重买",      pill: "warn", glyph: "i-refresh" },
+  busy:           { label: "正在执行",   sub: "",                      pill: "busy", glyph: "i-refresh", busy: true },
+};
+
+const $ = (id) => document.getElementById(id);
+// 元素缺失时返回哑对象：一处 DOM 改名不该让整个渲染崩掉（踩过两次）
+const need = (id) => document.getElementById(id) ||
+  new Proxy({}, { set: () => true, get: () => (() => {}) });
+const icon = (name) => `<svg viewBox="0 0 24 24"><use href="#${name}"/></svg>`;
+
+let lastState = null;
+let refreshing = false;
+let fetchFailures = 0;
+let stageState = {};
+let currentStage = null;
+let arcValue = 0;
+let arcTarget = 0;
+const rateHistory = [];
+
+/* ---------- 弹窗 / 提示 ---------- */
+function showDialog(title, text, buttons) {
+  return new Promise((resolve) => {
+    $("dlg-title").textContent = title;
+    $("dlg-text").textContent = text;
+    const box = $("dlg-buttons");
+    box.innerHTML = "";
+    buttons.forEach((spec) => {
+      const btn = document.createElement("button");
+      btn.className = "btn " + (spec.kind || "");
+      btn.textContent = spec.label;
+      btn.onclick = () => { $("overlay").classList.add("hide"); resolve(spec.value); };
+      box.appendChild(btn);
+    });
+    $("overlay").classList.remove("hide");
+  });
+}
+const askConfirm = (text, label = "确定", danger = false) =>
+  showDialog("确认", text, [
+    { label: "取消", value: false },
+    { label, value: true, kind: danger ? "danger" : "primary" },
+  ]);
+
+let lastToast = { text: null, at: 0 };
+function toast(text, kind = "info") {
+  // 一次动作可能同时来自「接口回执」和「后端推送」，别弹两条一样的
+  const now = Date.now();
+  if (text === lastToast.text && now - lastToast.at < 4000) return;
+  lastToast = { text, at: now };
+  const el = document.createElement("div");
+  el.className = "toast " + kind;
+  const glyph = kind === "ok" ? "i-check" : kind === "err" ? "i-alert" : "i-refresh";
+  el.innerHTML = icon(glyph);
+  el.appendChild(document.createTextNode(text));
+  $("toasts").appendChild(el);
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 220); }, 3800);
+}
+
+/* ---------- 数值格式 ---------- */
+function bytes(n) {
+  if (!n) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return n.toFixed(i === 0 ? 0 : 1) + " " + units[i];
+}
+const rate = (n) => (n ? bytes(n) + "/s" : "—");
+function fmtHours(h) {
+  if (h == null) return "—";
+  return h < 1 ? Math.round(h * 60) + " 分钟" : h.toFixed(1) + " 小时";
+}
+
+/* ---------- 光环 ---------- */
+function setArc(target, animate) {
+  arcTarget = Math.max(0, Math.min(1, target));
+  const el = need("orb").querySelector ? $("orb").querySelector(".arc") : null;
+  if (el) el.style.strokeDashoffset = String(ARC * (1 - arcTarget));
+  const mEl = $("m-orb") && $("m-orb").querySelector(".arc");
+  if (mEl) mEl.style.strokeDashoffset = String(ARC * (1 - arcTarget));
+}
+
+/* ---------- 曲线 ---------- */
+function drawSpark() {
+  const canvas = $("spark");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  if (rateHistory.length < 2) {
+    // 样本不足时画一条基线，别留一块空白
+    ctx.beginPath();
+    ctx.moveTo(0, h - 6);
+    ctx.lineTo(w, h - 6);
+    ctx.strokeStyle = "rgba(61,220,151,.22)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    return;
+  }
+  const peak = Math.max(8192, ...rateHistory);
+  const step = w / (rateHistory.length - 1);
+  const points = rateHistory.map((v, i) => [i * step, h - (v / peak) * (h - 14) - 6]);
+
+  ctx.beginPath();
+  points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "rgba(61,220,151,.30)");
+  grad.addColorStop(1, "rgba(61,220,151,0)");
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  ctx.beginPath();
+  points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+  ctx.strokeStyle = "#3ddc97"; ctx.lineWidth = 2; ctx.lineJoin = "round";
+  ctx.stroke();
+
+  const [lx, ly] = points[points.length - 1];
+  ctx.beginPath(); ctx.arc(lx, ly, 3, 0, Math.PI * 2);
+  ctx.fillStyle = "#3ddc97"; ctx.fill();
+}
+
+/* ---------- 渲染 ---------- */
+let lastStepsKey = null;
+function renderSteps(active, done) {
+  const list = $("steps");
+  if (!list) return 0;
+  // 步骤没变就别重建 DOM —— 每 3 秒重建一次会把正在播放的脉冲动画打断
+  const key = active + "|" + STAGES.map(([k]) => (done[k] ? 1 : 0)).join("");
+  if (key === lastStepsKey) return Object.keys(done).filter((k) => done[k]).length;
+  lastStepsKey = key;
+  list.innerHTML = "";
+  let doneCount = 0;
+  for (const [key, label] of STAGES) {
+    const state = done[key] ? "done" : (key === active ? "active" : null);
+    if (state === "done") doneCount++;
+    const li = document.createElement("li");
+    li.className = state || "";
+    li.innerHTML = `<span class="mark">${state === "done" ? icon("i-check")
+                    : state === "active" ? icon("i-refresh") : icon("i-clock")}</span><span>${label}</span>`;
+    list.appendChild(li);
+  }
+  return doneCount;
+}
+
+function pushLog(event) {
+  const line = document.createElement("div");
+  const level = (event.level || "").toLowerCase();
+  if (level === "error") line.className = "err";
+  else if (level === "warning") line.className = "warn";
+  line.innerHTML = `<time>${event.ts || ""}</time>`;
+  line.appendChild(document.createTextNode(event.message || ""));
+  const log = $("log");
+  log.appendChild(line);
+  while (log.childElementCount > 300) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
+}
+
+function render(s) {
+  lastState = s;
+  const m = s.machine || {}, srv = s.server || {}, conn = s.connection || {},
+        dm = s.daemons || {}, tr = s.traffic || {};
+  const busy = s.busy || null;
+  let st = s.state || "no_machine";
+  if (st === "busy" && busy === "connect") st = "connecting";
+  const meta = STATES[st] || STATES.no_machine;
+
+  document.body.classList.add("ready");
+  need("ver").textContent = "v" + (s.version || "");
+  need("pill").className = "pill " + (meta.pill || "");
+  need("pill-text").textContent = meta.label;
+
+  const problems = [];
+  if (s.last_error) problems.push(s.last_error);
+  if (st === "install_failed") problems.push("服务端装了很久仍未就绪，建议销毁后重来。");
+  if (st === "degraded") problems.push("内核在运行，但走代理访问不通。");
+  need("banner").classList.toggle("hide", problems.length === 0);
+  need("banner-text").textContent = problems.join("  ");
+
+  /* 主光环 */
+  const orb = need("orb");
+  orb.classList.toggle("on", !!meta.on);
+  orb.classList.toggle("busy", !!meta.busy);
+  need("orb-glyph").innerHTML = `<use href="#${meta.glyph}"/>`;
+  need("hero-state").textContent = meta.label;
+  need("hero-state").style.color = st === "connected" ? "var(--brand)"
+    : (meta.busy ? "var(--info)" : (meta.pill === "warn" ? "var(--warn)" : "var(--text)"));
+
+  // 就绪之后所有阶段都算完成；安装中才用实时阶段；没有机器时全是待办
+  const effectiveDone = (m.exists && m.ready)
+    ? Object.fromEntries(STAGES.map(([key]) => [key, true]))
+    : stageState;
+  const doneCount = renderSteps(currentStage, effectiveDone);
+  if (st === "installing" || busy === "provision") {
+    setArc(doneCount / STAGES.length);
+  } else if (meta.on) {
+    setArc(1);
+  } else if (meta.busy) {
+    setArc(0.28);
+  } else {
+    setArc(0);
+  }
+
+  need("hero-sub").innerHTML = st === "connected"
+    ? `<span class="hl mono">${srv.address || "?"}</span> · ${srv.sni || ""}`
+    : (st === "installing" ? `已用 <span class="hl">${s.install_age_seconds || 0}</span> 秒 · 等 cloud-init 装完`
+       : (st === "busy" || busy ? (busy || "执行中") + "…" : meta.sub));
+
+  /* 主按钮 */
+  const canConnect = !!(m.exists && m.ready);
+  const btn = need("btn-connect");
+  btn.disabled = !!busy || (!canConnect && !conn.running);
+  btn.className = "btn primary" + (conn.running ? " off" : "");
+  btn.innerHTML = (busy === "connect" || busy === "disconnect")
+    ? `<span class="spin"></span>${busy === "connect" ? "正在连接…" : "正在断开…"}`
+    : icon("i-power") + (conn.running ? "断开" : (canConnect ? "连接" : "还没有可用的服务端"));
+
+  /* 详情 */
+  need("srv-addr").textContent = srv.address ? `${srv.address}:${srv.port}` : "—";
+  need("srv-sni").textContent = srv.sni || "—";
+  need("srv-ver").textContent = srv.xray_version || "—";
+  need("srv-test").textContent = srv.selftest === "ok" ? "通过" : (srv.selftest || "—");
+  need("srv-test").style.color = srv.selftest === "ok" ? "var(--brand)" : "";
+  need("srv-ident").textContent = srv.identity ? srv.identity + "…" : "—";
+  need("conn-kernel").textContent = conn.running ? `运行中 · pid ${conn.pid}` : "未运行";
+  need("conn-sysproxy").textContent = conn.system_proxy ? "已开启" : "已关闭";
+  need("conn-port").textContent = conn.port || "—";
+  need("sw-watch").classList.toggle("on", !!dm.watch);
+  need("sw-reconcile").classList.toggle("on", !!dm.reconcile);
+  need("watch-hint").textContent = dm.watch ? "已开启 · 回收后自动重买并切好代理"
+                                            : "机器被回收后自动重买";
+
+  /* 实时 */
+  need("panel-traffic").classList.toggle("hide", !conn.running);
+  if (conn.running) {
+    rateHistory.push(tr.download_rate || 0);
+    while (rateHistory.length > 48) rateHistory.shift();
+    drawSpark();
+    need("tr-down").textContent = tr.available ? rate(tr.download_rate) : "—";
+    need("tr-up").textContent = tr.available ? rate(tr.upload_rate) : "—";
+    need("tr-total").textContent = tr.available
+      ? `${bytes(tr.download_total)} ↓ / ${bytes(tr.upload_total)} ↑` : "—";
+    need("tr-conns").textContent = tr.available ? tr.conns ?? tr.connections : "—";
+  }
+
+  /* 机器页 */
+  const mOrb = need("m-orb");
+  mOrb.classList.toggle("on", !!meta.on || (m.exists && m.ready));
+  mOrb.classList.toggle("busy", st === "installing" || busy === "provision");
+  need("m-orb-glyph").innerHTML = `<use href="#${m.reclaimed ? "i-refresh" : meta.glyph}"/>`;
+  need("m-state").textContent = m.exists
+    ? (m.ready ? "运行中" : "安装中") : (m.reclaimed ? "已被回收" : "未购买");
+  need("m-state").style.color = m.reclaimed ? "var(--warn)"
+    : (m.ready ? "var(--text)" : "var(--text-dim)");
+  need("m-sub").textContent = m.exists
+    ? `已运行 ${fmtHours(m.hours)}`
+    : (m.reclaimed
+        ? `实例 ${m.id || ""} 已不在 · 原 IP ${m.last_ip || "—"}`
+        : "点下面按钮，买一台香港机器并把服务端装好");
+  need("m-id").textContent = m.id || "—";
+  need("m-ip").textContent = m.ip || "—";
+  need("m-spec").textContent = m.type || "—";
+  need("m-zone").textContent = m.zone || "—";
+  need("m-bill").textContent = m.spot ? "竞价（抢占式）" : "—";
+  need("m-price").textContent = m.price_limit ? `${m.price_limit} 元/小时` : "—";
+  need("m-hours").textContent = fmtHours(m.hours);
+  need("m-cost").textContent = m.hours && m.price_limit
+    ? `约 ${(m.hours * m.price_limit).toFixed(2)} 元` : "—";
+  need("btn-provision").disabled = !!busy;
+  need("btn-provision").innerHTML = busy === "provision"
+    ? `<span class="spin"></span>正在购买安装…` : icon("i-download") + (m.exists ? "重新创建" : "购买并安装");
+  need("btn-destroy").disabled = !!busy || !m.exists;
+  need("btn-selftest").disabled = !!busy || !m.ready;
+  if (st === "installing" || busy === "provision") {
+    need("m-bar").classList.remove("hide");
+    need("m-bar-fill").style.width = (doneCount / STAGES.length * 100).toFixed(0) + "%";
+  } else {
+    need("m-bar").classList.add("hide");
+  }
+
+  /* 订阅 */
+  const sub = s.subscription || {};
+  need("sub-url").textContent = sub.available
+    ? `http://${sub.lan_ip}:${location.port || 8765}/sub/${sub.token}` : "还没有可用的服务端";
+
+  /* 空状态引导 */
+  const actions = need("connect-actions");
+  if (!m.exists && !m.reclaimed) {
+    actions.innerHTML = `<button class="btn" id="btn-goto"><svg viewBox="0 0 24 24"><use href="#i-server"/></svg>去「机器」页购买</button>`;
+    $("btn-goto").onclick = () => document.querySelector('nav button[data-tab="machine"]').click();
+  } else {
+    const extra = conn.running
+      ? `<button class="btn" id="btn-copy-ip"><svg viewBox="0 0 24 24"><use href="#i-copy"/></svg>复制出口 IP</button>` : "";
+    actions.innerHTML = `<button class="btn" id="btn-verify"><svg viewBox="0 0 24 24"><use href="#i-pulse"/></svg>测出口</button>${extra}`;
+    $("btn-verify").onclick = verifyExit;
+    const copyBtn = $("btn-copy-ip");
+    if (copyBtn) copyBtn.onclick = async () => {
+      try { await navigator.clipboard.writeText(srv.address || ""); toast("已复制出口 IP", "ok"); }
+      catch (e) { toast("复制失败", "err"); }
+    };
+  }
+
+  /* 设置 */
+  const c = s.config || {};
+  const editing = document.activeElement && document.activeElement.tagName === "INPUT";
+  if (!editing) {
+    need("cfg-types").value = (c.instance_types || []).join(", ");
+    need("cfg-zones").value = (c.zones || []).join(", ");
+    need("cfg-mul").value = c.spot_bid_multiplier ?? 1.5;
+    need("cfg-dests").value = (c.reality_dests || []).join(", ");
+    need("cfg-port").value = c.xray_port ?? 443;
+    need("cfg-xray").value = c.xray_version ?? "latest";
+    need("cfg-gb").value = (c.budget || {}).max_gb ?? 300;
+  }
+}
+
+async function refresh() {
+  if (refreshing) return;
+  refreshing = true;
+  try {
+    const res = await fetch("/api/state");
+    render(await res.json());
+    fetchFailures = 0;
+  } catch (e) {
+    // 一次失败不代表后台没了（网络抖动、重启、休眠唤醒都会）。
+    // 已经渲染出来的状态比"猜后台还活着"更可信，所以连续失败 3 次才改口。
+    fetchFailures += 1;
+    if (fetchFailures >= 3) {
+      need("pill").className = "pill warn";
+      need("pill-text").textContent = "后台未响应";
+    }
+  } finally {
+    refreshing = false;
+  }
+}
+
+async function post(path, body, okMessage) {
+  try {
+    const res = await fetch(path, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) toast(data.error || ("请求失败 " + res.status), "err");
+    else if (okMessage) toast(okMessage, "ok");
+  } catch (e) {
+    toast("请求没发出去：" + e.message, "err");
+  }
+  refresh();
+}
+
+function verifyExit() {
+  return fetch("/api/verify", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+    .then((r) => r.json())
+    .then((v) => toast(v.ok ? `出口正常 · ${v.actual_exit}` : `出口异常 · ${v.note}`,
+                       v.ok ? "ok" : "err"))
+    .catch(() => toast("校验请求失败", "err"));
+}
+
+/* ---------- 交互 ---------- */
+document.querySelectorAll("nav button").forEach((btn) => {
+  btn.onclick = () => {
+    document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b === btn));
+    ["connect", "machine", "settings"].forEach((tab) =>
+      need("tab-" + tab).classList.toggle("hide", tab !== btn.dataset.tab));
+    need("tab-" + btn.dataset.tab).classList.add("fadein");
+    setTimeout(() => need("tab-" + btn.dataset.tab).classList.remove("fadein"), 320);
+  };
+});
+
+need("btn-connect").onclick = () => {
+  const running = lastState && lastState.connection && lastState.connection.running;
+  return post(running ? "/api/disconnect" : "/api/connect", {});
+};
+need("btn-provision").onclick = () => post("/api/provision", {}, "开始购买安装");
+need("btn-destroy").onclick = async () => {
+  const yes = await askConfirm(
+    "确认销毁机器？会立即停止计费，代理断开。\n凭据保留，之后重买不用重配客户端。", "销毁", true);
+  if (yes) post("/api/destroy", {}, "已销毁");
+};
+need("btn-selftest").onclick = () => post("/api/selftest", {}, "自检已开始");
+need("sw-watch").onclick = () => {
+  const on = !(lastState && lastState.daemons && lastState.daemons.watch);
+  post("/api/watch", { enabled: on }, on ? "自动重建已开启" : "自动重建已关闭");
+};
+need("btn-copy-sub").onclick = async () => {
+  const url = need("sub-url").textContent;
+  if (!url || url.indexOf("http") !== 0) { toast("还没有订阅地址", "err"); return; }
+  try { await navigator.clipboard.writeText(url); toast("订阅地址已复制", "ok"); }
+  catch (e) { toast("复制失败，请手动选中", "err"); }
+};
+need("btn-show-qr").onclick = () => {
+  const wrap = need("qr-wrap");
+  if (!wrap.classList.contains("hide")) { wrap.classList.add("hide"); return; }
+  const img = need("qr-img");
+  img.onerror = () => { wrap.classList.add("hide"); toast("本机没装 qrcode", "err"); };
+  img.src = "/api/sub-qr.png?t=" + Date.now();
+  wrap.classList.remove("hide");
+};
+need("btn-save").onclick = () => post("/api/config", {
+  instance_types: need("cfg-types").value.split(",").map((x) => x.trim()).filter(Boolean),
+  zones: need("cfg-zones").value.split(",").map((x) => x.trim()).filter(Boolean),
+  spot_bid_multiplier: parseFloat(need("cfg-mul").value) || 1.5,
+  reality_dests: need("cfg-dests").value.split(",").map((x) => x.trim()).filter(Boolean),
+  xray_port: parseInt(need("cfg-port").value, 10) || 443,
+  xray_version: need("cfg-xray").value.trim() || "latest",
+  budget: { max_gb: parseInt(need("cfg-gb").value, 10) || 300 },
+}, "设置已保存");
+need("btn-reset-hint").onclick = () => {
+  need("cfg-types").value = "ecs.e-c1m1.large, ecs.t6-c1m1.large, ecs.u1-c1m1.large";
+  need("cfg-zones").value = "cn-hongkong-b, cn-hongkong-c, cn-hongkong-d";
+  need("cfg-mul").value = 1.5;
+  need("cfg-port").value = 443;
+  need("cfg-xray").value = "latest";
+  need("cfg-gb").value = 300;
+  need("cfg-dests").value = "www.cloudflare.com, www.bing.com, www.apple.com, www.microsoft.com";
+  toast("已填入推荐值，记得点保存", "info");
+};
+
+/* ---------- 事件流 ---------- */
+const es = new EventSource("/api/events");
+es.onmessage = (msg) => {
+  let event;
+  try { event = JSON.parse(msg.data); } catch (e) { return; }
+  if (event.kind === "log") {
+    pushLog(event);
+    if (event.stage && event.stage !== currentStage) {
+      if (currentStage) stageState[currentStage] = "done";
+      currentStage = event.stage;
+      if (event.stage !== "rollback") stageState[event.stage] = "active";
+      renderSteps(currentStage, stageState);
+    }
+  } else if (event.kind === "action") {
+    if (event.message) toast(event.message, event.phase === "error" ? "err" : "ok");
+    if (event.phase === "start" && event.action === "provision") {
+      stageState = {}; currentStage = null; lastStepsKey = null; renderSteps(null, {});
+    }
+    refresh();
+  } else if (event.kind === "state") {
+    // 后端发现状态变了就推一下，界面立刻取最新（合并 120ms 内的多次推送）
+    scheduleRefresh();
+  }
+};
+
+let refreshTimer = null;
+function scheduleRefresh() {
+  if (refreshTimer) return;
+  refreshTimer = setTimeout(() => { refreshTimer = null; refresh(); }, 120);
+}
+
+// 后端内联的初始状态：有它就先画真数据，没有就等第一次 fetch
+try {
+  const boot = JSON.parse((document.getElementById("boot") || {}).textContent || "null");
+  if (boot && boot.state) render(boot);
+} catch (e) { /* 内联状态坏了不影响后续轮询 */ }
+
+refresh();
+setInterval(refresh, 15000);   // 兜底：推送万一断了也能自己恢复
+</script>
+</body>
+</html>

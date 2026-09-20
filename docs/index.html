@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>驿 · Yi —— 抢占式实例上的 VLESS/REALITY 代理</title>
+<link rel="icon" type="image/png" href="assets/icon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<meta name="description" content="一年几十块的香港代理。机器被回收自动重建，客户端不用重配。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="驿 · Yi —— 抢占式实例上的 VLESS/REALITY 代理">
+<meta property="og:description" content="一年几十块的香港代理。机器被回收自动重建，客户端不用重配。">
+<meta property="og:image" content="https://cinqsme.github.io/yi/assets/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root {
+    --bg: #0a0c11; --surface: #12151d; --surface-2: #171b25; --line: #242a36;
+    --text: #eef1f6; --dim: #8b93a3; --faint: #5c6474; --brand: #3ddc97;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background:
+      radial-gradient(1100px 520px at 50% -12%, rgba(61,220,151,.07), transparent 62%),
+      var(--bg);
+    color: var(--text);
+    font: 16px/1.7 -apple-system, "PingFang SC", "SF Pro Text", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+  img.banner { width: 100%; display: block; }
+
+  h2 { font-size: 22px; font-weight: 650; letter-spacing: -.01em; margin: 0 0 14px; }
+  h3 { font-size: 15px; font-weight: 650; margin: 0 0 8px; }
+  p { color: var(--dim); margin: 0 0 14px; }
+  a { color: var(--brand); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--surface-2); border: 1px solid var(--line);
+    padding: 1px 6px; border-radius: 6px; color: #cfe9dd;
+  }
+  section { padding: 56px 0; border-top: 1px solid var(--line); }
+  section:first-of-type { border-top: none; }
+
+  .term {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 20px; font: 13.5px/1.9 ui-monospace, SFMono-Regular, Menlo, monospace;
+    overflow-x: auto; box-shadow: 0 20px 50px -30px rgba(0,0,0,.9);
+  }
+  .term .c { color: var(--brand); }
+  .term .o { color: var(--dim); }
+  .term .p { color: var(--faint); }
+
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .grid.three { grid-template-columns: repeat(3, 1fr); }
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,.022), transparent 40%), var(--surface);
+    border: 1px solid var(--line); border-radius: 14px; padding: 20px;
+  }
+  .card p { margin: 0; font-size: 14px; }
+  .card .num {
+    font: 12px ui-monospace, Menlo, monospace; color: var(--brand);
+    letter-spacing: .1em; margin-bottom: 10px; display: block;
+  }
+  @media (max-width: 760px) { .grid, .grid.three { grid-template-columns: 1fr; } }
+
+  .badges { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 26px; }
+  .badge {
+    font-size: 12px; color: var(--dim); border: 1px solid var(--line);
+    background: var(--surface-2); padding: 4px 11px; border-radius: 999px;
+  }
+  footer { padding: 40px 0 60px; color: var(--faint); font-size: 13px; }
+  .links { display: flex; flex-wrap: wrap; gap: 20px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<img class="banner" src="assets/banner.svg" alt="驿 · Yi">
+
+<div class="wrap">
+  <section>
+    <div class="badges">
+      <span class="badge">MIT</span>
+      <span class="badge">Python 3.12+</span>
+      <span class="badge">macOS 11+</span>
+      <span class="badge">运行时零第三方依赖</span>
+      <span class="badge">App < 1 MB</span>
+    </div>
+
+    <h2>两年以前的做法，在抢占式实例上会立刻崩</h2>
+    <p>
+      “买台 VPS，跑个脚本”假设机器是长期的、IP 是固定的。竞价实例两条都不满足：
+      随时被回收、IP 每次都变、密钥也会变。这个项目的绝大部分代码在处理这件事。
+    </p>
+
+    <div class="term">
+      <div><span class="p">$</span> <span class="c">./yi up</span></div>
+      <div class="o">出价上限 0.030 元/小时（市场价峰值 0.020 × 1.5），含保护期</div>
+      <div class="o">实例 i-xxxx 已提交，等待 Running…</div>
+      <div class="o">实例状态: Pending → Stopped → 显式启动它 → Running</div>
+      <div class="o">公网 IP: 47.52.1.2，等待 cloud-init 完成安装…</div>
+      <div class="o">www.cloudflare.com 自检结果: ok</div>
+      <div><span class="o">服务端自检: 通过（已在服务器上回环验证 VLESS/REALITY 可用）</span></div>
+      <div><span class="p">$</span> <span class="c">./yi connect</span></div>
+      <div class="o">出口校验: 出口与服务端一致（47.52.1.2）</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>它认真处理了这六件事</h2>
+    <div class="grid">
+      <div class="card">
+        <span class="num">01</span>
+        <h3>随时被回收</h3>
+        <p>声明式期望状态 + 调和循环：内核崩了、地址变了、系统代理被人关了，8 秒内自己纠正。</p>
+      </div>
+      <div class="card">
+        <span class="num">02</span>
+        <h3>回收后客户端要重配</h3>
+        <p>凭据持久化（UUID + REALITY 密钥对），重建出来对客户端仍是“同一台”。机器换了，连接不换。</p>
+      </div>
+      <div class="card">
+        <span class="num">03</span>
+        <h3>不知道卡在哪</h3>
+        <p>后端日志映射成真实阶段推给界面：创建 → 启动 → 分配 IP → 安装 → 选择伪装目标 → 自检。</p>
+      </div>
+      <div class="card">
+        <span class="num">04</span>
+        <h3>机器没了顺带断网</h3>
+        <p>绝不把系统代理指向没人监听的端口；内核起不来就自动回退直连，不让你整台机器失联。</p>
+      </div>
+      <div class="card">
+        <span class="num">05</span>
+        <h3>伪装域名选不好</h3>
+        <p>REALITY 要求伪装目标的证书链足够短。工具按候选列表逐个起服务实测，用第一个真正通的。</p>
+      </div>
+      <div class="card">
+        <span class="num">06</span>
+        <h3>成本失控</h3>
+        <p>按流量计费 + 预算闸门 + 资源 ttl 标签；创建失败自动回滚，不留孤儿资源。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>架构</h2>
+    <div class="term">
+      <div>驿.app（Swift + WKWebView，不到 1 MB）　<span class="p">← 只负责显示与点击</span></div>
+      <div class="o">　│ HTTP + SSE on 127.0.0.1</div>
+      <div>agent.py（Python 3.12，零第三方依赖）　<span class="p">← 唯一的"大脑"</span></div>
+      <div class="o">　├── 调阿里云 OpenAPI（自己实现签名）</div>
+      <div class="o">　└── 管 mihomo 子进程</div>
+      <div>mihomo（成熟开源内核）　<span class="p">← 真正的代理，不自己写协议</span></div>
+    </div>
+    <p style="margin-top:18px">
+      用系统自带的 WebKit 当渲染层，所以应用不到 1 MB
+      （Electron 约 200 MB、Tauri 约 10–20 MB），启动也最快；
+      壳里没有任何网络逻辑。
+    </p>
+  </section>
+
+  <section>
+    <h2>成本</h2>
+    <div class="grid three">
+      <div class="card"><h3>竞价实例</h3><p>香港 2C2G 实测出价 <b>0.03 元/小时</b></p></div>
+      <div class="card"><h3>公网流量</h3><p>按量计费约 0.5–0.8 元/GB</p></div>
+      <div class="card"><h3>个人用量合计</h3><p>每天几小时 + 几十 GB，约 <b>每月 ¥20–50</b></p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>文档</h2>
+    <div class="links">
+      <a href="https://github.com/cinqsme/yi/blob/main/docs/quickstart.md">快速开始</a>
+      <a href="https://github.com/cinqsme/yi/blob/main/docs/configuration.md">配置参考</a>
+      <a href="https://github.com/cinqsme/yi/blob/main/docs/architecture.md">架构与设计决策</a>
+      <a href="https://github.com/cinqsme/yi/blob/main/docs/lessons.md">踩坑记录</a>
+      <a href="https://github.com/cinqsme/yi/blob/main/docs/design.md">界面设计系统</a>
+      <a href="https://github.com/cinqsme/yi/blob/main/docs/faq.md">常见问题</a>
+      <a href="https://github.com/cinqsme/yi/blob/main/docs/troubleshooting.md">故障排查</a>
+      <a href="https://github.com/cinqsme/yi/blob/main/docs/roadmap.md">路线图</a>
+      <a href="https://github.com/cinqsme/yi/wiki">Wiki</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="links">
+      <a href="https://github.com/cinqsme/yi">GitHub</a>
+      <a href="https://github.com/cinqsme/yi/releases">Releases</a>
+      <a href="https://github.com/cinqsme/yi/blob/main/CHANGELOG.md">变更日志</a>
+      <a href="https://github.com/cinqsme/yi/blob/main/LICENSE">MIT License</a>
+    </div>
+    <p style="margin-top:18px">
+      仅供个人自有服务器的网络用途。请自行确认所在地与账号所属地对跨境代理服务的适用规定。
+    </p>
+  </footer>
+</div>
+
+</body>
+</html>

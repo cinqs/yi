@@ -1,0 +1,31 @@
+# 可选但推荐：把 make check 里的静态检查提前到 commit 阶段。
+#   pipx install pre-commit && pre-commit install
+#
+# 注意：单元测试**故意不放在这里** —— 它要跑十几秒，挂在 commit 上
+# 只会让人养成 `--no-verify` 的习惯。测试留给 CI 和 make check。
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8          # 跟 pyproject 锁定的 ruff 保持一致
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]
+      - id: check-yaml
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: no-secrets
+        name: 脱敏检查（凭据 / 真实云资源 ID）
+        entry: ./tools/check-no-secrets.sh
+        language: system
+        pass_filenames: false

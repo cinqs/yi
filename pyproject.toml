@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=77"]      # PEP 639 的 SPDX 许可证写法需要 77+
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yi"
+version = "0.1.0"
+description = "一条命令买下阿里云香港竞价实例，自动装好 VLESS + REALITY 代理"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+
+# 作者署名不写死个人账号：这是项目元数据，不是身份信息。
+# 想换成你自己，直接改这一行（tools/set-owner.sh 也会提示）。
+authors = [{ name = "Yi contributors" }]
+keywords = ["vless", "reality", "xray", "mihomo", "proxy", "aliyun", "ecs", "spot-instance", "macos"]
+
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "Natural Language :: Chinese (Simplified)",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Internet :: Proxy Servers",
+  "Topic :: System :: Systems Administration",
+]
+
+# **故意为空**：运行时只用标准库。这条约束写在 AGENTS.md 的"不可动摇的约束"里，
+# 加依赖前先想清楚 —— 它会让"clone 完就能跑"变成"得先装一堆东西"。
+dependencies = []
+
+[project.optional-dependencies]
+qr = ["qrcode>=7.4"]     # 只有需要生成二维码时才用到
+dev = ["ruff>=0.16"]
+
+[project.urls]
+Homepage = "https://github.com/cinqsme/yi"
+Documentation = "https://github.com/cinqsme/yi/tree/main/docs"
+Repository = "https://github.com/cinqsme/yi"
+Changelog = "https://github.com/cinqsme/yi/blob/main/CHANGELOG.md"
+Issues = "https://github.com/cinqsme/yi/issues"
+Wiki = "https://github.com/cinqsme/yi/wiki"
+
+[project.scripts]
+yi = "yi.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+exclude = ["vendor", "dist", ".venv"]
+
+[tool.ruff.lint]
+# E/W 基础规则；F 是 pyflakes（未使用变量/导入）；I 是 import 排序；UP 是现代语法
+select = ["E", "W", "F", "I", "UP", "B"]
+ignore = [
+  "E501",   # 行长由 ruff format 管，不再自己数
+  "B008",   # 这里没有 FastAPI 那种依赖注入
+
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试里大量用 mock，允许更长的函数与更松的写法
+"tests/*" = ["E402", "B011"]
+# 打包脚本是 shell/HTML 混合字符串，别管行宽
+"app/build-macos.sh" = ["E501"]

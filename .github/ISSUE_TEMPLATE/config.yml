@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问题 / 讨论
+    url: https://github.com/cinqsme/yi/discussions
+    about: 安装、配置、选规格之类的问题请走 Discussions
+  - name: 安全问题
+    url: https://github.com/cinqsme/yi/security/advisories/new
+    about: 请勿开公开 issue，见 SECURITY.md

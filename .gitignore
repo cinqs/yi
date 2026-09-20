@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 构建产物
+dist/
+build/
+vendor/
+
+# 本地状态：里面是 AccessKey、SSH 私钥、代理凭据 —— 永远不要提交
+.yi-run/
+*.local.toml
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+
+# 测试工具留下的
+.playwright-cli/
+*.log

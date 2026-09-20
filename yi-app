@@ -1,0 +1,6 @@
+#!/bin/sh
+# 启动 yi.app 的本地 agent（前端是浏览器里的 Web UI；Electron 壳在 A7 再做）
+set -e
+HERE=$(cd "$(dirname "$0")" && pwd)
+PORT="${1:-8765}"
+exec "$HERE/.venv/bin/python" "$HERE/app/agent.py" --port "$PORT"

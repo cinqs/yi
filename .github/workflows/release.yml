@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 要发布 tag（如 v0.1.0）
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  macos-app:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 uv 与 Python 3.12
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        run: |
+          uv venv --python 3.12
+          uv pip install -e .
+
+      - name: 打包 App
+        run: ./app/build-macos.sh
+
+      - name: 压缩
+        run: |
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent Yi.app "Yi-${{ github.ref_name }}.zip"
+          shasum -a 256 "Yi-${{ github.ref_name }}.zip" > "Yi-${{ github.ref_name }}.zip.sha256"
+
+      - name: 发布
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Yi-*.zip
+            dist/Yi-*.zip.sha256
+          generate_release_notes: true
+          draft: false

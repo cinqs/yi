@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# 驿 · Yi —— 启动器
+#
+# 名字取自古代邮驿：沿途换马、驿路不停；这里换的是被回收的抢占式实例。
+# 优先用 uv 管理的虚拟环境（Python 3.12+），没有就让 uv 现场建，最后才退回系统 python3。
+#
+set -e
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+if [ -x "$HERE/.venv/bin/python" ]; then
+    exec "$HERE/.venv/bin/python" -m yi.cli "$@"
+fi
+if command -v uv >/dev/null 2>&1; then
+    exec uv run --project "$HERE" python -m yi.cli "$@"
+fi
+PYTHONPATH="$HERE/src" exec python3 -m yi.cli "$@"

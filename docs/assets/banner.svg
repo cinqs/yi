@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12151d"/>
+      <stop offset="1" stop-color="#0a0c11"/>
+    </linearGradient>
+    <linearGradient id="globe" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5cf0b4"/>
+      <stop offset="1" stop-color="#1fae79"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#3ddc97" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#3ddc97" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0v32" fill="none" stroke="#ffffff" stroke-opacity=".028"/>
+    </pattern>
+  </defs>
+
+  <rect width="1280" height="320" fill="url(#bg)"/>
+  <rect width="1280" height="320" fill="url(#grid)"/>
+  <circle cx="1035" cy="160" r="230" fill="url(#halo)"/>
+
+  <g transform="translate(120 92)">
+    <rect width="136" height="136" rx="34" fill="#161a23" stroke="#242a36"/>
+    <g fill="none" stroke="url(#globe)" stroke-width="4" stroke-linecap="round">
+      <circle cx="68" cy="68" r="41"/>
+      <ellipse cx="68" cy="68" rx="17" ry="41"/>
+      <ellipse cx="68" cy="68" rx="32" ry="41"/>
+      <path d="M27 68h82"/>
+    </g>
+  </g>
+
+  <text x="304" y="150" font-family="-apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif"
+        font-size="76" font-weight="700" fill="#eef1f6" letter-spacing="2">驿</text>
+  <text x="404" y="150" font-family="-apple-system, 'Helvetica Neue', sans-serif"
+        font-size="60" font-weight="300" fill="#6b7280">Yi</text>
+
+  <text x="306" y="196" font-family="-apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif"
+        font-size="21" fill="#8b93a3">换马不换路 —— 抢占式实例上的 VLESS / REALITY 代理</text>
+
+  <text x="306" y="240" font-family="-apple-system, 'PingFang SC', sans-serif" font-size="16"
+        fill="#5c6474">一年几十块的香港代理　·　机器被回收自动重建　·　客户端不用重配</text>
+
+  <rect x="304" y="262" width="4" height="20" rx="2" fill="#3ddc97"/>
+  <text x="322" y="278" font-family="ui-monospace, Menlo, monospace" font-size="15" fill="#3ddc97">
+    ./yi up &amp;&amp; ./yi connect
+  </text>
+</svg>

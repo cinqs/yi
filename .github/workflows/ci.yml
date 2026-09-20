@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 单独一个 job，因为它最快、失败得最贵（凭据一旦进历史就洗不掉了）。
+  # 而且它不需要装任何依赖 —— 出问题时你 5 秒内就知道，不用等 Python 环境。
+  secret-scan:
+    name: 脱敏检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./tools/check-no-secrets.sh
+
+  check:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 uv 与 Python 3.12
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: 安装依赖
+        run: |
+          uv venv --python 3.12
+          uv pip install -e .
+          uv pip install ruff
+
+      # 用 make check 而不是把步骤抄一遍：本地和 CI 跑的就一定是同一套。
+      # 抄一遍的后果是"我本地过了啊"——因为 CI 里少了一步或多了一步。
+      - name: make check（脱敏 + 界面语法 + ruff + 单测）
+        run: make check
+
+      # cloud-init 脚本里是 bash + heredoc + JSON 混合体，最容易"悄悄写坏"。
+      # 渲染出来做一次语法检查，比等到真机上 3 分钟后失败便宜太多。
+      - name: 渲染 cloud-init 并做 bash 语法检查
+        run: |
+          uv run python -c "
+          import sys; sys.path.insert(0, 'src')
+          from yi import state
+          from yi.bootstrap import render_user_data
+          open('/tmp/bootstrap.sh', 'w').write(render_user_data(state.load_config()))
+          "
+          bash -n /tmp/bootstrap.sh
+
+  # 只在 macOS 上建 App：这一步能拦住"改了 agent 接口但忘了改外壳"、
+  # "swiftc 编译不过"、"build 脚本里路径写死"这类问题。
+  # 不放进 release 才发现，是因为发版时才发现是最糟的时机。
+  app:
+    name: 打包 macOS App
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 uv 与 Python 3.12
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        run: |
+          uv venv --python 3.12
+          uv pip install -e .
+
+      - name: 打包
+        run: ./app/build-macos.sh
+
+      - name: 确认产物真的存在
+        run: |
+          test -d dist/Yi.app || { echo "dist/Yi.app 没有生成"; exit 1; }
+          test -f dist/Yi.app/Contents/Info.plist || { echo "Info.plist 缺失"; exit 1; }
+          # App 必须自带运行时，否则它只在这台机器上能用（Release 发出去的 zip 会直接废掉）
+          for f in Contents/Resources/agent.py \
+                   Contents/Resources/ui/index.html \
+                   Contents/Resources/src/yi/cli.py \
+                   Contents/Resources/assets/icon-256.png; do
+            test -f "dist/Yi.app/$f" || { echo "App 里缺少 $f"; exit 1; }
+          done
+          test -x dist/Yi.app/Contents/MacOS/yi || { echo "可执行文件缺失"; exit 1; }
+          # 把自带资源单独拷到一个空目录里导入一次 —— 这是"可迁移"的实际检验：
+          # 只要这一步过了，App 就不依赖源码目录在哪。
+          # agent.py 有 __main__ 保护，导入不会起服务。
+          rm -rf /tmp/yi-probe && mkdir -p /tmp/yi-probe
+          cp -R dist/Yi.app/Contents/Resources/. /tmp/yi-probe/
+          python3 - <<'PY'
+          import importlib.util, sys
+          spec = importlib.util.spec_from_file_location("agent", "/tmp/yi-probe/agent.py")
+          mod = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          assert mod.UI_DIR == "/tmp/yi-probe/ui", mod.UI_DIR
+          print("自带资源可独立导入 OK（ui:", mod.UI_DIR, "）")
+          PY
+          du -sh dist/Yi.app
+
+  docs:
+    name: 文档链接
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./tools/check-doc-links.sh

@@ -1,0 +1,58 @@
+name: 报告问题
+description: 出了故障、报错、或者行为不符合预期
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先跑一下 `./yi doctor --api`，它能把大部分问题定位到具体一步。
+        日志在 `~/.config/yi/logs/`，贴之前**请把 IP、UUID、AccessKey 打码**。
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: 卡在哪一步
+      options:
+        - 安装准备（uv / Python / 依赖）
+        - 凭证与权限（doctor --api）
+        - 购买机器（yi up）
+        - 安装服务端（cloud-init / 自检）
+        - 连接（yi connect）
+        - 客户端（v2rayNG / Clash / sing-box）
+        - 图形界面
+        - 其它
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 期望的行为 vs 实际的行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志（已打码）
+      description: 用 ``` 包起来；`~/.config/yi/logs/` 下最新的那个文件最有价值
+      render: shell
+
+  - type: input
+    id: versions
+    attributes:
+      label: 版本
+      placeholder: "yi --version / macOS 版本 / Python 版本"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认
+      options:
+        - label: 我读过 docs/troubleshooting.md
+          required: true
+        - label: 我贴出的内容里没有真实 IP / UUID / AccessKey
+          required: true
