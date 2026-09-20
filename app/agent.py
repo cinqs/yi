@@ -28,7 +28,29 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(os.path.dirname(HERE), "src"))
+
+
+def _locate_package_root() -> str | None:
+    """找出 `yi` 包在哪。
+
+    这个文件有**两种**摆放方式，必须都能跑：
+      源码布局  <repo>/app/agent.py            → 包在 <repo>/src/yi
+      打包布局  <app>/Contents/Resources/agent.py → 包在 Resources/src/yi
+    只按源码布局写死 `dirname(HERE)/src` 的话，装进 App 之后 import 就失败——
+    而这类失败在开发机上会被"我自己装过 yi"掩盖掉，非等到干净环境才暴露。
+    """
+    for candidate in (
+        os.path.join(os.path.dirname(HERE), "src"),  # 源码布局
+        os.path.join(HERE, "src"),  # 打包布局
+    ):
+        if os.path.isdir(os.path.join(candidate, "yi")):
+            return candidate
+    return None
+
+
+_PACKAGE_ROOT = _locate_package_root()
+if _PACKAGE_ROOT:
+    sys.path.insert(0, _PACKAGE_ROOT)
 
 from yi import __version__, proxy, state, status  # noqa: E402
 from yi.cli import (  # noqa: E402

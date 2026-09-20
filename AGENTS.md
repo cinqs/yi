@@ -144,6 +144,9 @@ PWCLI=~/.codex/skills/playwright/scripts/playwright_cli.sh
    `exec "$HERE/vpnctl"` 改成 `exec "$HERE/yi"` → 自己 exec 自己、无限循环，
    而进程数一直是 1，`ps` 看着完全正常。
 9. **`xray run -test -config` 按文件扩展名判断格式**，临时配置必须以 `.json` 结尾。
+10. **别用"本机装了包"的解释器验证打包布局**：开发机跑过 `pip install -e .`，
+   `import yi` 永远成功，会把"打包后路径算错"盖住。`tests/test_app_bundle.py`
+   用 `python -S` 起干净解释器 —— 去掉 `-S` 这个测试就永远绿。
 
 ## 约定
 
