@@ -77,9 +77,30 @@ git push origin :refs/tags/v0.2.0        # 删远端
 - [ ] README 的徽章是绿的（CI 通过了）
 - [ ] 需要的话，把这次的踩坑补进 `docs/lessons.md`
 
-## 四、仓库设置（一次性，不是每次发版）
+## 四、第一次开源（一次性，不是每次发版）
 
-新克隆/新 fork 之后，把这些点一遍，否则徽章和链接会是坏的：
+### 1. 建仓库并推上去
+
+```bash
+# 仓库名建议就叫 yi；不要勾选 "Add README"（本地已经有了）
+git remote add origin git@github.com:cinqsme/yi.git
+git push -u origin main
+```
+
+> 如果 GitHub 用户名不是 `cinqsme`，先跑 `./tools/set-owner.sh <你的名字>`，
+> 它会替换 README 徽章、issue 模板、CODEOWNERS、CHANGELOG 里的所有 `OWNER`
+> 占位符（之前是 `OWNER`，已经替换过一次）。落在 LICENSE 里的署名也可以用
+> 第二个参数单独指定：`./tools/set-owner.sh <用户名> "<署名>"`。
+
+### 2. 把 Wiki 推上去
+
+```bash
+./tools/sync-wiki.sh --push     # 会推到 <repo>.wiki.git
+```
+
+第一次推之前要先在 Settings 里勾上 **Wikis**，否则那个 wiki 仓库还不存在。
+
+### 3. 设置（漏一个就是一个坏掉的徽章或链接）
 
 | 位置 | 设置 |
 |---|---|
@@ -90,6 +111,18 @@ git push origin :refs/tags/v0.2.0        # 删远端
 | Settings → Security | 打开 **Private vulnerability reporting**（SECURITY.md 靠它） |
 | 仓库首页 | Social preview 用 `docs/assets/social-preview.png` |
 | Topics | `proxy` `vless` `reality` `xray` `aliyun` `spot-instance` `macos` |
+
+### 4. 打第一个 tag
+
+```bash
+git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0
+```
+
+会触发 Release workflow，产出 `Yi-v0.1.0.zip` + 校验和。
+
+> **下载试用一次**。zip 里的 App 自带 agent/界面/源码，但它仍然需要机器上有
+> Python 3.11+（`/usr/bin/python3` 在 macOS 上是 3.9，不够）。这一条要写进
+> Release notes，否则用户会以为是 App 坏了。
 
 ## 五、签名与公证（还没做）
 
