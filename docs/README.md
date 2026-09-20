@@ -3,7 +3,7 @@
 这个目录里是**权威文档**：和代码在同一个仓库、同一个 PR 里 review，
 所以不会像外部 wiki 那样悄悄过期。
 
-想"赶紧用起来"的话，[Wiki](https://github.com/cinqsme/yi/wiki) 更顺手；
+想"赶紧用起来"的话，[Wiki](https://github.com/cinqs/yi/wiki) 更顺手；
 想懂原理、想改代码，就在这儿。
 
 ## 上手

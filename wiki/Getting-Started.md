@@ -52,7 +52,7 @@
 ## 1. 装好并写入凭据
 
 ```bash
-git clone https://github.com/cinqsme/yi && cd yi
+git clone https://github.com/cinqs/yi && cd yi
 make setup
 ./tools/set-credentials.sh
 ```

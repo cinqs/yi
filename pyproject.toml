@@ -38,12 +38,12 @@ qr = ["qrcode>=7.4"]     # 只有需要生成二维码时才用到
 dev = ["ruff>=0.16"]
 
 [project.urls]
-Homepage = "https://github.com/cinqsme/yi"
-Documentation = "https://github.com/cinqsme/yi/tree/main/docs"
-Repository = "https://github.com/cinqsme/yi"
-Changelog = "https://github.com/cinqsme/yi/blob/main/CHANGELOG.md"
-Issues = "https://github.com/cinqsme/yi/issues"
-Wiki = "https://github.com/cinqsme/yi/wiki"
+Homepage = "https://github.com/cinqs/yi"
+Documentation = "https://github.com/cinqs/yi/tree/main/docs"
+Repository = "https://github.com/cinqs/yi"
+Changelog = "https://github.com/cinqs/yi/blob/main/CHANGELOG.md"
+Issues = "https://github.com/cinqs/yi/issues"
+Wiki = "https://github.com/cinqs/yi/wiki"
 
 [project.scripts]
 yi = "yi.cli:main"

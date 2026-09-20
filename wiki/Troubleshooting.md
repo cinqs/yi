@@ -89,6 +89,6 @@ curl -sS https://api.ip.sb/ip                              # 直连的出口
 
 ## 更多
 
-[docs/troubleshooting.md](https://github.com/cinqsme/yi/blob/main/docs/troubleshooting.md)
-里有更细的分支，[docs/lessons.md](https://github.com/cinqsme/yi/blob/main/docs/lessons.md)
+[docs/troubleshooting.md](https://github.com/cinqs/yi/blob/main/docs/troubleshooting.md)
+里有更细的分支，[docs/lessons.md](https://github.com/cinqs/yi/blob/main/docs/lessons.md)
 里有这些坑的完整根因。

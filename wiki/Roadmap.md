@@ -44,5 +44,5 @@
 
 ## 想参与
 
-看 [贡献指南](https://github.com/cinqsme/yi/blob/main/CONTRIBUTING.md)。
+看 [贡献指南](https://github.com/cinqs/yi/blob/main/CONTRIBUTING.md)。
 `good first issue` 标签下的事情都是从上面这些拆出来的。

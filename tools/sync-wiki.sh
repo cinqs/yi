@@ -25,8 +25,8 @@ if [ -z "$origin" ]; then
 fi
 
 # 从 HTTPS 或 SSH 形式的 origin 推出 wiki 仓库地址。
-#   https://github.com/cinqsme/yi.git  → https://github.com/cinqsme/yi.wiki.git
-#   git@github.com:cinqsme/yi.git      → git@github.com:cinqsme/yi.wiki.git
+#   https://github.com/cinqs/yi.git  → https://github.com/cinqs/yi.wiki.git
+#   git@github.com:cinqs/yi.git      → git@github.com:cinqs/yi.wiki.git
 case "$origin" in
   *.wiki.git) wiki_url="$origin" ;;
   *.git)      wiki_url="${origin%.git}.wiki.git" ;;

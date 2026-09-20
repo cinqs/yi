@@ -1,9 +1,9 @@
 # 默认所有改动都需要维护者过目。
 # 发现这个文件没生效？多半是仓库不是组织、或者你没开 "Require review from Code Owners"。
-*       @cinqsme
+*       @cinqs
 
 # 这几处直接关系用户的钱和隐私，改动一定要慢。
-/src/yi/aliyun.py       @cinqsme
-/src/yi/bootstrap.py    @cinqsme
-/SECURITY.md            @cinqsme
-/.github/workflows/     @cinqsme
+/src/yi/aliyun.py       @cinqs
+/src/yi/bootstrap.py    @cinqs
+/SECURITY.md            @cinqs
+/.github/workflows/     @cinqs

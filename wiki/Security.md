@@ -41,6 +41,6 @@
 ## 报告漏洞
 
 **请不要开公开 issue。** 走 GitHub 的
-[私密漏洞报告](https://github.com/cinqsme/yi/security/advisories/new)。
+[私密漏洞报告](https://github.com/cinqs/yi/security/advisories/new)。
 
-完整策略见 [SECURITY.md](https://github.com/cinqsme/yi/blob/main/SECURITY.md)。
+完整策略见 [SECURITY.md](https://github.com/cinqs/yi/blob/main/SECURITY.md)。

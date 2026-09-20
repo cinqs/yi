@@ -60,5 +60,5 @@
 - SSH 主机密钥变更时清除旧记录并重试（阿里云会回收并重分配 IP）
 - RAM 最小权限策略、SSH 仅密钥、本地敏感文件 0600
 
-[Unreleased]: https://github.com/cinqsme/yi/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/cinqsme/yi/releases/tag/v0.1.0
+[Unreleased]: https://github.com/cinqs/yi/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/cinqs/yi/releases/tag/v0.1.0

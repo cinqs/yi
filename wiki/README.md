@@ -20,7 +20,7 @@ GitHub 的 wiki 是**另一个独立的 git 仓库**（`<repo>.wiki.git`），
   —— 所以**用英文文件名、中文标题**，改名等于改 URL
 - `_Sidebar.md` 是左侧导航，`_Footer.md` 是页脚，GitHub 会自动带上
 - 页面之间用 `[文字](页面名)` 互链，**不要带 `.md`**
-- 指向主仓库文件的链接要写全 `https://github.com/cinqsme/yi/blob/main/...`
+- 指向主仓库文件的链接要写全 `https://github.com/cinqs/yi/blob/main/...`
 
 ## 和 `docs/` 的分工
 

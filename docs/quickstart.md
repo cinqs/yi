@@ -41,7 +41,7 @@
 ## 1. 装好并写入凭据
 
 ```bash
-git clone https://github.com/cinqsme/yi && cd yi
+git clone https://github.com/cinqs/yi && cd yi
 make setup                   # uv + Python 3.12 + 虚拟环境
 ./tools/set-credentials.sh   # 交互式输入 AccessKey（不回显、不进 shell 历史）
 ```

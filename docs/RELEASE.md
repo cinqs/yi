@@ -83,14 +83,16 @@ git push origin :refs/tags/v0.2.0        # 删远端
 
 ```bash
 # 仓库名建议就叫 yi；不要勾选 "Add README"（本地已经有了）
-git remote add origin git@github.com:cinqsme/yi.git
+git remote add origin git@github.com:cinqs/yi.git
 git push -u origin main
 ```
 
-> 如果 GitHub 用户名不是 `cinqsme`，先跑 `./tools/set-owner.sh <你的名字>`，
-> 它会替换 README 徽章、issue 模板、CODEOWNERS、CHANGELOG 里的所有 `OWNER`
-> 占位符（之前是 `OWNER`，已经替换过一次）。落在 LICENSE 里的署名也可以用
-> 第二个参数单独指定：`./tools/set-owner.sh <用户名> "<署名>"`。
+> 这个仓库已经按 `cinqs` 配好了。**如果你是 fork 过来自己用**，跑
+> `./tools/set-owner.sh <你的用户名>` 一次性换掉 README 徽章、文档链接、
+> issue 模板、CODEOWNERS、CHANGELOG 的 compare 链接和 `pyproject` 里的项目主页
+> —— 它会自动从 `pyproject.toml` 认出当前的旧名字，不用你手填。
+> LICENSE 里的署名可以用第二个参数单独指定：
+> `./tools/set-owner.sh <用户名> "<署名>"`。
 
 ### 2. 把 Wiki 推上去
 

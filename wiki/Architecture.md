@@ -72,5 +72,5 @@ degraded > ready > no_machine`。**正在忙**永远压过一切——
 
 ## 深入阅读
 
-- [docs/architecture.md](https://github.com/cinqsme/yi/blob/main/docs/architecture.md) —— 完整版，含状态机与云资源流程
-- [docs/lessons.md](https://github.com/cinqsme/yi/blob/main/docs/lessons.md) —— 这些设计是被哪些真实事故逼出来的
+- [docs/architecture.md](https://github.com/cinqs/yi/blob/main/docs/architecture.md) —— 完整版，含状态机与云资源流程
+- [docs/lessons.md](https://github.com/cinqs/yi/blob/main/docs/lessons.md) —— 这些设计是被哪些真实事故逼出来的

@@ -45,4 +45,4 @@
 请自行确认你所在地区与账号所属地区的适用法律法规。
 
 <sub>文档由仓库的 `wiki/` 目录同步而来，权威版本始终在
-[仓库的 docs/ 目录](https://github.com/cinqsme/yi/tree/main/docs)。</sub>
+[仓库的 docs/ 目录](https://github.com/cinqs/yi/tree/main/docs)。</sub>

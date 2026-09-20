@@ -21,5 +21,5 @@
 
 **参与**
 
-- [贡献指南](https://github.com/cinqsme/yi/blob/main/CONTRIBUTING.md)
-- [源码仓库](https://github.com/cinqsme/yi)
+- [贡献指南](https://github.com/cinqs/yi/blob/main/CONTRIBUTING.md)
+- [源码仓库](https://github.com/cinqs/yi)

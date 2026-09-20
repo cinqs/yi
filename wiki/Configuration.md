@@ -23,7 +23,7 @@
 ```
 
 **完整参考（每一项都解释了"为什么是这个默认值"）**：
-[docs/configuration.md](https://github.com/cinqsme/yi/blob/main/docs/configuration.md)
+[docs/configuration.md](https://github.com/cinqs/yi/blob/main/docs/configuration.md)
 
 ## 命令行覆盖
 

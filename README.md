@@ -1,14 +1,14 @@
 <img src="docs/assets/banner.svg" alt="驿 · Yi" width="100%">
 
 <p>
-  <a href="https://github.com/cinqsme/yi/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cinqsme/yi/ci.yml?branch=main&style=flat-square&label=CI"></a>
-  <a href="https://cinqsme.github.io/yi"><img alt="Docs" src="https://img.shields.io/badge/docs-GitHub%20Pages-3ddc97?style=flat-square"></a>
+  <a href="https://github.com/cinqs/yi/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cinqs/yi/ci.yml?branch=main&style=flat-square&label=CI"></a>
+  <a href="https://cinqs.github.io/yi"><img alt="Docs" src="https://img.shields.io/badge/docs-GitHub%20Pages-3ddc97?style=flat-square"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-3ddc97?style=flat-square"></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square&logo=python&logoColor=white">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-11+-000000?style=flat-square&logo=apple&logoColor=white">
   <img alt="Runtime deps" src="https://img.shields.io/badge/runtime%20deps-0-3ddc97?style=flat-square">
   <img alt="App size" src="https://img.shields.io/badge/app-%3C1%20MB-3ddc97?style=flat-square">
-  <a href="https://github.com/cinqsme/yi/wiki"><img alt="Wiki" src="https://img.shields.io/badge/wiki-%E4%B8%AD%E6%96%87-3ddc97?style=flat-square"></a>
+  <a href="https://github.com/cinqs/yi/wiki"><img alt="Wiki" src="https://img.shields.io/badge/wiki-%E4%B8%AD%E6%96%87-3ddc97?style=flat-square"></a>
 </p>
 
 **驿 (Yi)** 帮你用**一年几十块**跑起一台属于自己的代理：
@@ -66,7 +66,7 @@
 - macOS 11+，装好 [uv](https://docs.astral.sh/uv/)
 
 ```bash
-git clone https://github.com/cinqsme/yi && cd yi
+git clone https://github.com/cinqs/yi && cd yi
 make setup                       # Python 3.12 + 虚拟环境
 ./tools/set-credentials.sh       # 交互式写入 AccessKey（不回显、不进 shell 历史）
 ```
@@ -148,8 +148,8 @@ make app && open dist/Yi.app
 
 全部文档见 **[文档索引](docs/README.md)**。
 
-也可以看 [Wiki](https://github.com/cinqsme/yi/wiki)（按问题组织，比 docs 更适合
-"我就想赶紧用起来"），或 [GitHub Pages 站点](https://cinqsme.github.io/yi)。
+也可以看 [Wiki](https://github.com/cinqs/yi/wiki)（按问题组织，比 docs 更适合
+"我就想赶紧用起来"），或 [GitHub Pages 站点](https://cinqs.github.io/yi)。
 
 ## 路线图
 
