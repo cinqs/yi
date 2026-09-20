@@ -62,6 +62,9 @@ Makefile 会自动退回用 `.venv`。
    要么按更安全的一侧升级并大声记日志。历史上就是静默忽略保护期导致实例被秒回收。
 9. **绝不把系统代理指向没有监听的端口**。这类失误的代价是**用户整机断网**，
    宁可不连。`set_system_proxy()` 里有硬保险，别绕过它。
+10. **不自研 Android 客户端**。Android 端要做的是 `VpnService` + 内核集成 +
+   证书管理一整套，自己重写只会更差。用 v2rayNG，我们只负责**把客户端交到
+   用户手上**（`yi android` 取官方 APK + 生成订阅）。
 
 ## 代码地图
 
@@ -73,6 +76,7 @@ Makefile 会自动退回用 `.venv`。
 | `src/yi/cli.py` | 命令编排与资源回滚 |
 | `src/yi/proxy.py` | mihomo 内核的获取与生命周期、系统代理开关、出口校验、流量采样 |
 | `src/yi/identity.py` | 凭据持久化（UUID + REALITY 密钥对）→ 重建后客户端不用重配 |
+| `src/yi/android.py` | 取 v2rayNG 官方 APK（**不自研 Android 客户端**，理由见下） |
 | `src/yi/status.py` | **状态的唯一来源**：8 状态机 + `snapshot()` |
 | `src/yi/state.py` | `~/.config/yi` 下的配置与状态（含旧目录自动迁移） |
 | `app/agent.py` | 本地 HTTP + SSE 服务，界面唯一的后端 |

@@ -16,7 +16,7 @@ import urllib.request
 from datetime import UTC, datetime
 from typing import Any
 
-from . import __version__, configgen, identity, proxy, ssh, state
+from . import __version__, android, configgen, identity, proxy, ssh, state
 from .aliyun import AlidnsClient, AliyunError, EcsClient, load_credentials
 from .bootstrap import render_user_data
 
@@ -205,6 +205,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_kernel.add_argument("--url", help="直接给出压缩包地址（绕墙或指定版本时用）")
     p_kernel.add_argument("--force", action="store_true", help="已存在也重新下载")
     p_kernel.set_defaults(func=cmd_fetch_kernel)
+
+    p_android = sub.add_parser("android", help="取一份 Android 客户端 APK（官方原版）")
+    p_android.add_argument(
+        "--abi",
+        default="arm64-v8a",
+        choices=list(android.SUPPORTED_ABIS),
+        help="手机 CPU 架构，绝大多数手机是 arm64-v8a",
+    )
+    p_android.add_argument(
+        "--flavor",
+        default=android.DEFAULT_FLAVOR,
+        choices=["playstore", "fdroid"],
+        help="playstore 渠道走 Google 签名与更新；fdroid 不含 Google 相关依赖",
+    )
+    p_android.add_argument("--url", help="直接给出 APK 地址（绕墙或钉住版本时用）")
+    p_android.add_argument("--dir", help="保存目录，默认 ~/Downloads/yi-android")
+    p_android.set_defaults(func=cmd_android)
 
     p_watch = sub.add_parser("watch", help="守护：竞价实例被回收后自动重建")
     p_watch.add_argument("--interval", type=float, default=60.0)
@@ -1111,6 +1128,31 @@ def cmd_fetch_kernel(args) -> int:
     size = os.path.getsize(path)
     print(f"\n完成：{path}（{size / 1024 / 1024:.1f} MB）")
     print("接下来：./yi connect")
+    return 0
+
+
+def cmd_android(args) -> int:
+    """取一份 Android 客户端。
+
+    Android 端不自研客户端（见 AGENTS.md 的原则），用成熟的 v2rayNG。
+    但它的下载页在 GitHub Releases 上，国内常常打不开 —— 机器买好了、
+    服务端装好了，人却装不上客户端。这条命令就是补这一环。
+    """
+    dest_dir = args.dir or os.path.join(os.path.expanduser("~"), "Downloads", "yi-android")
+    print(f"保存到：{dest_dir}")
+    print(f"目标规格：{args.abi} / {args.flavor}")
+    try:
+        path, sha256, tag = android.download_apk(dest_dir, abi=args.abi, flavor=args.flavor, url=args.url)
+    except android.AndroidError as exc:
+        print(f"\n{exc}", file=sys.stderr)
+        return 1
+
+    print(f"\n完成：{path}")
+    if tag:
+        print(f"版本：{tag}")
+    print(f"大小：{os.path.getsize(path) / 1048576:.1f} MB")
+    print(f"sha256：{sha256}")
+    print(android.next_steps(path, android.running_subscription_url()))
     return 0
 
 

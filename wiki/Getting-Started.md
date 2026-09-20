@@ -105,6 +105,14 @@ make app && open dist/Yi.app
 
 ## 5. 手机（Android）
 
+先取客户端：
+
+```bash
+./yi android      # v2rayNG 的官方 APK，下到 ~/Downloads/yi-android/
+```
+
+GitHub Releases 国内常常打不开，这一步就是替你跨过去。传到手机装好后：
+
 `up` 之后，本机会起一个只读订阅端点。手机和电脑连**同一个 Wi-Fi**，
 在界面「连接」页找到**手机订阅**，扫码或复制地址，然后在 v2rayNG 里
 `+` → 从剪贴板导入。以后机器换 IP，手机端刷新订阅即可，**不用重新配置**。

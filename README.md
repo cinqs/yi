@@ -102,6 +102,7 @@ make app && open dist/Yi.app
 | `yi up` / `down` | 创建 / 销毁（中途失败自动回滚，不留计费资源） |
 | `yi connect` / `disconnect` | 起停代理内核 + 系统代理 |
 | `yi fetch-kernel` | 下载代理内核 mihomo（不入库，用到才取；`--url` 可绕墙） |
+| `yi android` | 取一份 Android 客户端 APK（v2rayNG 官方原版） |
 | `yi status` / `proxy-status` | 机器、连接、出口 IP |
 | `yi sub` | 重新生成客户端配置（v2rayNG 订阅 / Clash / sing-box） |
 | `yi selftest` | 在服务器上回环自测：自己当客户端连自己 |
@@ -109,6 +110,10 @@ make app && open dist/Yi.app
 | `yi doctor` | 本地与云端逐项体检 |
 
 ## 客户端
+
+**Android**：`./yi android` 会把 v2rayNG 的官方 APK 取到 `~/Downloads/yi-android/`
+——GitHub Releases 国内常常打不开，这一步就是替你跨过去。装好后用界面上的二维码
+或下面的订阅导入即可。
 
 `yi up` 会在 `~/.config/yi/profiles/` 生成：
 

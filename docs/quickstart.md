@@ -107,10 +107,17 @@ make app && open dist/Yi.app
 **Android（v2rayNG）**
 
 ```bash
+./yi android                                    # 取官方 APK（GitHub 国内常常打不开）
 pbcopy < ~/.config/yi/profiles/v2rayng-subscription.txt
 ```
 
+把 `~/Downloads/yi-android/` 里的 APK 传到手机装上，然后
 v2rayNG → 右下 `+` → **从剪贴板导入** → 回主页点连接 → 允许 VPN 授权。
+
+> **为什么是 v2rayNG 而不是我们自己的 App**：Android 端要做的是
+> `VpnService` + 内核集成 + 证书管理一整套，自己重写只会更差，也违背本项目
+> "不自己造协议、用成熟开源实现"的原则。所以 Android 端我们只负责
+> **把客户端交到你手上**（取 APK + 生成订阅），不重复造一个。
 
 **macOS（Clash Verge Rev）**
 
