@@ -8,11 +8,17 @@
 颜色只在一层定义，组件里不出现裸色值：
 
 ```
-背景     --bg #0a0c11      表面 --surface / --surface-2 / --surface-3
-文字     --text #eef1f6    --text-dim / --text-faint
-品牌     --brand #3ddc97   （与 App 图标同色）
-语义     --info #5b8cff    --warn #f2b544    --danger #ff6b6b
+背景     --bg #0B0E14      表面 --surface / --surface-2 / --surface-3
+文字     --text #E9EDF6    --text-dim / --text-faint
+品牌     --brand #6B8AFD   （与 App 图标同色）
+语义     --info #6B8AFD    --warn #E4B363    --danger #E8756F
 ```
+
+**为什么是这一套**：底色是**冷灰蓝**（近黑带一点蓝），品牌色是**雾蓝紫**。
+换成这一版的理由是旧版的祖母绿饱和度太高、辉光又重，整体偏"电竞外设"；
+新配色把饱和度压下来、辉光收敛到只在"已连接"时出现，层次交给表面明度和
+发丝线去做。同一套色值贯穿 App / 落地页 / 图标 / 社交预览图 —— 任何一处
+单独改都会立刻显得不搭。
 
 **分层靠"表面明度"而不是描边**：`surface → surface-2 → surface-3` 递进，
 再加 1px 发丝线、极淡的顶部内高光、分层阴影。

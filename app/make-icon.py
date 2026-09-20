@@ -23,10 +23,10 @@ import png  # 来自 pypng，纯 Python
 
 DEFAULT_SIZE = 1024
 
-BG_TOP = (30, 41, 59)  # slate-800
-BG_BOTTOM = (12, 17, 27)  # 更深的底
-GLOBE = (52, 211, 153)  # emerald-400
-GLOBE_DIM = (16, 185, 129)  # emerald-500
+BG_TOP = (26, 34, 50)  # 冷灰蓝，和界面底色同一族
+BG_BOTTOM = (10, 14, 22)  # 更深的底
+GLOBE = (140, 168, 255)  # 品牌色亮端 #8CA8FF
+GLOBE_DIM = (74, 107, 232)  # 品牌色暗端 #4A6BE8
 
 
 def smoothstep(edge0: float, edge1: float, x: float) -> float:

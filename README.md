@@ -2,13 +2,13 @@
 
 <p>
   <a href="https://github.com/cinqs/yi/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cinqs/yi/ci.yml?branch=main&style=flat-square&label=CI"></a>
-  <a href="https://cinqs.github.io/yi"><img alt="Docs" src="https://img.shields.io/badge/docs-GitHub%20Pages-3ddc97?style=flat-square"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-3ddc97?style=flat-square"></a>
+  <a href="https://cinqs.github.io/yi"><img alt="Docs" src="https://img.shields.io/badge/docs-GitHub%20Pages-6B8AFD?style=flat-square"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-6B8AFD?style=flat-square"></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square&logo=python&logoColor=white">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-11+-000000?style=flat-square&logo=apple&logoColor=white">
-  <img alt="Runtime deps" src="https://img.shields.io/badge/runtime%20deps-0-3ddc97?style=flat-square">
-  <img alt="App size" src="https://img.shields.io/badge/app-%3C1%20MB-3ddc97?style=flat-square">
-  <a href="https://github.com/cinqs/yi/wiki"><img alt="Wiki" src="https://img.shields.io/badge/wiki-%E4%B8%AD%E6%96%87-3ddc97?style=flat-square"></a>
+  <img alt="Runtime deps" src="https://img.shields.io/badge/runtime%20deps-0-6B8AFD?style=flat-square">
+  <img alt="App size" src="https://img.shields.io/badge/app-%3C1%20MB-6B8AFD?style=flat-square">
+  <a href="https://github.com/cinqs/yi/wiki"><img alt="Wiki" src="https://img.shields.io/badge/wiki-%E4%B8%AD%E6%96%87-6B8AFD?style=flat-square"></a>
 </p>
 
 **驿 (Yi)** 帮你用**一年几十块**跑起一台属于自己的代理：
