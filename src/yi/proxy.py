@@ -325,7 +325,13 @@ def write_config(info: dict[str, Any], port: int = DEFAULT_MIXED_PORT, label: st
     state.ensure_home()
     os.makedirs(proxy_dir(), mode=0o700, exist_ok=True)
     # 控制接口走 unix socket：不占端口、不会和别的东西撞（状态查询/流量统计要用）
-    yaml_text = configgen.render_mihomo(info, label, mixed_port=port, controller_socket=controller_socket())
+    yaml_text = configgen.render_mihomo(
+        info,
+        label,
+        mixed_port=port,
+        controller_socket=controller_socket(),
+        direct_domains=state.load_config().get("direct_domains"),
+    )
     state.write_private(config_path(), yaml_text, 0o600)
     return config_path()
 

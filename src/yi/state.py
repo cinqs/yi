@@ -17,6 +17,71 @@ import stat
 import tomllib
 from typing import Any
 
+# 中国大陆常见站点里**不是 .cn 结尾**的那些，走直连。
+#
+# 为什么要有这份名单：`GEOIP,CN,DIRECT` 也管用，但它得先把域名解析成真实 IP
+# 才能判断；在 fake-ip 模式下，每个新域名都要多一次解析，首包明显变慢。
+# 域名规则是字符串比对，直接命中、不用解析。两者配合：
+# 这份名单覆盖常用的，GEOIP 兜住剩下的。
+#
+# 想加就加（写 `example.com` 这种后缀，不用带 `.` 前缀）。
+DEFAULT_DIRECT_DOMAINS = [
+    # 腾讯
+    "qq.com",
+    "tencent.com",
+    "gtimg.com",
+    "weixin.com",
+    # 百度 / 阿里
+    "baidu.com",
+    "bdstatic.com",
+    "alipay.com",
+    "taobao.com",
+    "tmall.com",
+    "alicdn.com",
+    "alibaba.com",
+    "aliyun.com",
+    "aliyuncs.com",
+    "dingtalk.com",
+    # 电商 / 生活
+    "jd.com",
+    "360buyimg.com",
+    "pinduoduo.com",
+    "meituan.com",
+    "dianping.com",
+    "ctrip.com",
+    "qunar.com",
+    "ele.me",
+    # 内容 / 社区
+    "bilibili.com",
+    "hdslb.com",
+    "iqiyi.com",
+    "youku.com",
+    "douyin.com",
+    "toutiao.com",
+    "bytedance.com",
+    "kuaishou.com",
+    "xiaohongshu.com",
+    "zhihu.com",
+    "douban.com",
+    "weibo.com",
+    "sina.com.cn",
+    "sohu.com",
+    "163.com",
+    "126.net",
+    "netease.com",
+    "ximalaya.com",
+    # 硬件 / 云 / 开发者
+    "xiaomi.com",
+    "mi.com",
+    "huawei.com",
+    "hicloud.com",
+    "csdn.net",
+    "gitee.com",
+    "cnblogs.com",
+    "oschina.net",
+]
+
+
 DEFAULT_CONFIG: dict[str, Any] = {
     "region": "cn-hongkong",
     "zones": ["cn-hongkong-b", "cn-hongkong-c", "cn-hongkong-d"],
@@ -43,6 +108,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "xray_version": "latest",
     "xray_port": 443,
     "vless_flow": "xtls-rprx-vision",
+    # 直连的域名后缀。见上面 DEFAULT_DIRECT_DOMAINS 里的说明。
+    "direct_domains": list(DEFAULT_DIRECT_DOMAINS),
     # REALITY 的伪装目标（"偷证书"的对象）。硬性要求：
     #   1) 从香港可达，支持 TLS1.3 + HTTP/2；
     #   2) **证书链要短** —— REALITY 会把 dest 的真实证书链抓下来、替换签名后发给客户端，

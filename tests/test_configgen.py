@@ -66,6 +66,64 @@ class ProfileTests(unittest.TestCase):
         self.assertIn('short-id: "{}"'.format(INFO["short_id"]), text)
         self.assertIn("MATCH,PROXY", text)
 
+    def test_mihomo_bypasses_lan_before_anything_else(self):
+        """局域网必须先于 MATCH,PROXY 命中。
+
+        少了这几条，访问 NAS / 打印机 / 路由器管理页会被兜底规则抓走，
+        绕到香港再回来 —— 结果是打不开，而且把内网地址交给了代理。
+        """
+        rules = configgen.mihomo_rules()
+        match_at = rules.index("  - MATCH,PROXY")
+        for cidr in ("192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12", "127.0.0.0/8"):
+            rule = f"  - IP-CIDR,{cidr},DIRECT,no-resolve"
+            self.assertIn(rule, rules)
+            self.assertLess(rules.index(rule), match_at, f"{cidr} 必须排在 MATCH 之前")
+        self.assertLess(rules.index("  - IP-CIDR6,fc00::/7,DIRECT,no-resolve"), match_at)
+
+    def test_ip_rules_say_no_resolve(self):
+        """IP-CIDR 不带 no-resolve 会为了匹配域名而去解析 DNS —— 白白多一次查询，
+        而且在 fake-ip 下拿到的是假地址，等于白解析。"""
+        for rule in configgen.mihomo_rules():
+            if "IP-CIDR," in rule or "IP-CIDR6," in rule:
+                self.assertTrue(rule.endswith(",no-resolve"), rule)
+
+    def test_matcher_is_last(self):
+        """兜底规则必须在最后 —— 放前面会让后面所有规则失效。"""
+        self.assertEqual(configgen.mihomo_rules()[-1], "  - MATCH,PROXY")
+
+    def test_cn_rules_use_domain_first_then_geoip(self):
+        rules = configgen.mihomo_rules()
+        self.assertIn("  - DOMAIN-SUFFIX,cn,DIRECT", rules)
+        self.assertIn("  - GEOIP,CN,DIRECT", rules)
+        # 域名规则先于 GEOIP：域名是字符串比对，不用解析，首包更快
+        self.assertLess(rules.index("  - DOMAIN-SUFFIX,cn,DIRECT"), rules.index("  - GEOIP,CN,DIRECT"))
+
+    def test_custom_direct_domains_are_used(self):
+        rules = configgen.mihomo_rules(["Example.COM", ".foo.cn", "example.com", ""])
+        self.assertIn("  - DOMAIN-SUFFIX,example.com,DIRECT", rules)
+        self.assertIn("  - DOMAIN-SUFFIX,foo.cn,DIRECT", rules)
+        # 重复与空值被清掉：同一个域名出现两次是纯粹的噪音
+        self.assertEqual(rules.count("  - DOMAIN-SUFFIX,example.com,DIRECT"), 1)
+
+    def test_empty_direct_domains_means_only_the_builtin_rules(self):
+        rules = configgen.mihomo_rules([])
+        self.assertNotIn("  - DOMAIN-SUFFIX,qq.com,DIRECT", rules)
+        self.assertIn("  - DOMAIN-SUFFIX,cn,DIRECT", rules)
+
+    def test_fake_ip_does_not_swallow_local_names(self):
+        """fake-ip 会代理掉所有域名解析，.local/.lan 被它接走的话，
+        AirDrop、打印机、投屏会突然找不到设备，而用户想不到是代理干的。"""
+        text = configgen.render_mihomo(INFO)
+        self.assertIn("fake-ip-filter:", text)
+        for pattern in ("'*.lan'", "'*.local'"):
+            self.assertIn(pattern, text)
+
+    def test_generated_config_drops_optional_controller_lines_cleanly(self):
+        """没有控制接口时，配置里不该留下空行或占位符。"""
+        text = configgen.render_mihomo(INFO)
+        self.assertNotIn("{", text)
+        self.assertNotIn("\n\n\n", text)
+
     def test_write_profiles_are_private(self):
         tmp = tempfile.TemporaryDirectory()
         saved = os.environ.get("YI_HOME")

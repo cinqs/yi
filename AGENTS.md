@@ -109,6 +109,7 @@ bootstrap 逐个写配置 + 起服务 + 回环自检，用第一个真正通的�
 |---|---|
 | 任何改动 | `make check` |
 | 界面（`app/ui/index.html`） | **用 playwright 真打开、真点、真截图**，并看 console 有没有报错 |
+| 生成的 mihomo 配置 | **字符串断言证明不了内核认它。** 有内核时 `tests/test_mihomo_config.py` 会真跑 `mihomo -t`；改规则后确认它没被 skip |
 | bootstrap 脚本 | 渲染后 `bash -n`（CI 里有这一步） |
 | 服务端参数 | `./yi selftest`（在服务器上自己当客户端连自己） |
 | 竞价/生命周期 | `./yi up --dry-run`，必要时真跑一次再 `./yi down` |

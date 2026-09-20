@@ -79,9 +79,41 @@
 | 键 | 默认 | 说明 |
 |---|---|---|
 | `mixed_port` | 自动 | 内核的 HTTP/SOCKS 混合端口。默认自动避让（7897 是 Clash Verge 的常用口，容易撞） |
+| `direct_domains` | 一长串国内域名 | 直连的域名后缀，见下 |
 | `want_connected` | 自动 | **期望状态**：`true` 时调和循环会保证"应该连着"。你点连接/断开时由界面写入 |
 | `watch_enabled` | `true` | 后台守护：实例被回收后自动重建。**默认开**，这是这套方案值钱的地方 |
 | `sub_token` | 自动生成 | 手机订阅端点的随机 token，首次需要时生成 |
+
+### 分流规则
+
+生成的 `mihomo.yaml` 里规则是**有顺序**的，顺序本身就是逻辑：
+
+```
+局域网/本机  →  直连        （192.168/10/172.16、链路本地、组播）
+联网探测域名 →  直连        （captive.apple.com 等）
+国内域名     →  直连        （.cn + direct_domains 里的那一串）
+其余国内 IP  →  直连        （GEOIP,CN）
+剩下的       →  走代理      （MATCH,PROXY）
+```
+
+**为什么局域网那几条必须自己列出来**：`GEOIP` 对私有地址返回空，只靠
+`GEOIP,CN` 兜不住。少了这一层，访问 NAS、打印机、路由器管理页会被最后的
+`MATCH,PROXY` 抓走，绕到香港再回来——结果是打不开，而且把内网地址交给了代理。
+
+**为什么国内域名要单独列一份**：`GEOIP,CN` 也管用，但它得先把域名解析成真实
+IP 才能判断；在 fake-ip 模式下每个新域名都要多一次解析，首包明显变慢。
+域名规则是字符串比对，直接命中。所以两者配合：名单管常用的，GEOIP 兜剩下的。
+
+```toml
+direct_domains = ["qq.com", "bilibili.com", "example.com"]
+```
+
+想加就加（写后缀，不用带 `.` 前缀）；置空数组就是"只要 `.cn` 和 GEOIP 那层"。
+改完跑 `./yi sub` 重新生成 profile。
+
+> ⚠️ 直接改 `~/.config/yi/profiles/mihomo.yaml` 是没用的，下次 `yi sub`
+> 会把它覆盖掉。规则要改就改配置里的 `direct_domains`，或者改代码里的
+> `configgen.mihomo_rules()`。
 
 ## 预算护栏
 
