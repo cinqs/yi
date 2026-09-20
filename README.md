@@ -82,6 +82,7 @@ make setup                       # Python 3.12 + 虚拟环境
 
 ```bash
 ./yi up               # 约 3 分钟：买机器 → 装服务端 → 回环自检 → 生成客户端配置
+./yi fetch-kernel     # 首次需要：取一份代理内核（约 15 MB，不入库）
 ./yi connect          # 连接（系统代理免密码设置）
 ./yi status           # 状态与出口 IP
 ./yi disconnect       # 断开并还原系统代理
@@ -100,6 +101,7 @@ make app && open dist/Yi.app
 |---|---|
 | `yi up` / `down` | 创建 / 销毁（中途失败自动回滚，不留计费资源） |
 | `yi connect` / `disconnect` | 起停代理内核 + 系统代理 |
+| `yi fetch-kernel` | 下载代理内核 mihomo（不入库，用到才取；`--url` 可绕墙） |
 | `yi status` / `proxy-status` | 机器、连接、出口 IP |
 | `yi sub` | 重新生成客户端配置（v2rayNG 订阅 / Clash / sing-box） |
 | `yi selftest` | 在服务器上回环自测：自己当客户端连自己 |

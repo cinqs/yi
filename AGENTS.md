@@ -36,6 +36,7 @@ Makefile 会自动退回用 `.venv`。
 | `make site` | 本地预览 GitHub Pages 站点（`docs/`） |
 | `./yi doctor --api` | 凭据 / 权限 / 交换机 / 安全组 / 镜像 / 竞价价格逐项体检 |
 | `./yi up --dry-run` | 只打印它打算买什么，不花钱 |
+| `./yi fetch-kernel` | 下载代理内核（不入库；`--url` 可绕墙、可指定版本） |
 
 数据目录 `~/.config/yi`（0700/0600）。老版本的 `~/.config/vpnctl` 会**自动迁移**，
 所以 `state.py` 里那个旧路径常量是**故意保留**的，删了迁移就废。
@@ -70,7 +71,7 @@ Makefile 会自动退回用 `.venv`。
 | `src/yi/bootstrap.py` | cloud-init：装 Xray、开 BBR、生成密钥、**服务端回环自检** |
 | `src/yi/configgen.py` | 生成 vless 链接 / v2rayNG 订阅 / mihomo.yaml / singbox.json |
 | `src/yi/cli.py` | 命令编排与资源回滚 |
-| `src/yi/proxy.py` | mihomo 内核生命周期、系统代理开关、出口校验、流量采样 |
+| `src/yi/proxy.py` | mihomo 内核的获取与生命周期、系统代理开关、出口校验、流量采样 |
 | `src/yi/identity.py` | 凭据持久化（UUID + REALITY 密钥对）→ 重建后客户端不用重配 |
 | `src/yi/status.py` | **状态的唯一来源**：8 状态机 + `snapshot()` |
 | `src/yi/state.py` | `~/.config/yi` 下的配置与状态（含旧目录自动迁移） |

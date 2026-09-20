@@ -88,9 +88,14 @@ make setup
 ## 4. 连接
 
 ```bash
+./yi fetch-kernel      # 首次需要：取一份 mihomo 内核（约 15 MB）
 ./yi connect
 ./yi status            # 确认出口 IP 是服务器 IP
 ```
+
+内核（mihomo）不随仓库分发——它有几十 MB、每个平台各一份，放 git 里会让项目
+胖几十倍。所以第一次连接前先取一份。直连 GitHub 不通时，报错信息里会给出
+可用的镜像地址写法，照抄 `--url` 即可。
 
 或者用图形界面：
 

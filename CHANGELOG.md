@@ -11,6 +11,9 @@
   既会让新用户直接失败，也没有道理。填了 ID 的老配置不受影响。
 
 ### 新增
+- **`yi fetch-kernel`**：代理内核（mihomo）不入库（几十 MB × 每个平台），
+  改成用到时自己取。直连 GitHub 不通时 `--url` 可指定镜像地址。
+  这是新用户此前唯一需要手工准备的东西
 - 文档：[配置参考](docs/configuration.md)、[发版检查单](docs/RELEASE.md)、
   [开发纪事](docs/history.md)，以及一套 11 页的 Wiki（`wiki/` 目录，用
   `tools/sync-wiki.sh` 同步到 GitHub Wiki）

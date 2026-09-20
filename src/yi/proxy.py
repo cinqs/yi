@@ -11,15 +11,21 @@ administrator privileges` 弹系统原生授权框——比常驻一个特权守
 from __future__ import annotations
 
 import contextlib
+import gzip
+import json
 import logging
 import os
+import platform
 import shutil
 import socket
 import subprocess
 import time
+import urllib.error
+import urllib.request
+import zipfile
 from typing import Any
 
-from . import configgen, state
+from . import __version__, configgen, state
 
 log = logging.getLogger("yi.proxy")
 
@@ -151,6 +157,147 @@ def mihomo_path() -> str | None:
     return shutil.which("mihomo") or shutil.which("clash-meta")
 
 
+# --------------------------------------------------------------------------
+# 内核下载
+#
+# 不把 mihomo 二进制放进仓库：它有几十 MB，而且每个平台/架构各一份，
+# 塞进 git 会把这项目变胖几十倍，还得跟着上游升级。改成"用到时自己取一份"。
+# --------------------------------------------------------------------------
+
+MIHOMO_RELEASE_API = "https://api.github.com/repos/MetaCubeX/mihomo/releases/latest"
+# 走不通时的备用入口（国内直连 GitHub 常常失败，但 api.github.com 一般可达）
+MIHOMO_MIRROR_HINT = "https://ghproxy.net/"
+
+
+def kernel_target_path() -> str:
+    return os.path.join(state.home_dir(), "bin", "mihomo")
+
+
+def go_arch(machine: str | None = None) -> str:
+    """把 ``platform.machine()`` 映射成 Go 的架构名（mihomo 的产物按 Go 命名）。"""
+    m = (machine or platform.machine()).lower()
+    if m in ("x86_64", "amd64"):
+        return "amd64"
+    if m in ("arm64", "aarch64"):
+        return "arm64"
+    if m in ("i386", "i686", "x86"):
+        return "386"
+    return m
+
+
+def go_os(sysname: str | None = None) -> str:
+    s = (sysname or platform.system()).lower()
+    return {"darwin": "darwin", "linux": "linux", "windows": "windows"}.get(s, s)
+
+
+def kernel_asset_name(
+    release: dict[str, Any], machine: str | None = None, sysname: str | None = None
+) -> str | None:
+    """从 GitHub release 的 JSON 里挑出适配本机的那个压缩包。
+
+    纯函数，不碰网络也不碰磁盘 —— 选错了用户会下载到一个跑不起来的二进制，
+    所以这段逻辑单独测（``tests/test_kernel_fetch.py``）。
+    """
+    want_os, want_arch = go_os(sysname), go_arch(machine)
+    assets = release.get("assets") or []
+    best: tuple[int, str] | None = None
+    for asset in assets:
+        name = str(asset.get("name") or "")
+        if not name.startswith("mihomo-"):
+            continue
+        if "-compatible" in name or "go1" in name:
+            continue
+        # 形如 mihomo-darwin-arm64-v1.19.2.gz / ....zip
+        parts = name.split("-")
+        if len(parts) < 4:
+            continue
+        if parts[1] != want_os or parts[2] != want_arch:
+            continue
+        if name.endswith(".gz"):
+            score = 0  # 单文件，解压即用
+        elif name.endswith(".zip"):
+            score = 1  # 需要再解一层，Windows 上常见
+        else:
+            continue
+        if best is None or score < best[0]:
+            best = (score, name)
+    return best[1] if best else None
+
+
+def _fetch_json(url: str, timeout: float = 20.0) -> dict[str, Any]:
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": f"yi/{__version__}", "Accept": "application/vnd.github+json"},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def fetch_kernel(url: str | None = None, api_url: str | None = None) -> str:
+    """下载 mihomo 内核到 ``~/.config/yi/bin/mihomo``，返回落盘路径。
+
+    ``url`` 直接给压缩包的地址（绕墙、或想用特定版本时用）；
+    不给就去 GitHub 查最新 release。
+    """
+    target = kernel_target_path()
+    os.makedirs(os.path.dirname(target), mode=0o700, exist_ok=True)
+
+    if url:
+        asset_url, asset_name = url, os.path.basename(url.split("?")[0])
+    else:
+        try:
+            release = _fetch_json(api_url or MIHOMO_RELEASE_API)
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            raise ProxyError(
+                f"连不上 GitHub 取内核列表（{exc}）。\n"
+                f"  国内网络常见。可以直接给出压缩包地址绕过去，例如：\n"
+                f"    yi fetch-kernel --url {MIHOMO_MIRROR_HINT}"
+                f"https://github.com/MetaCubeX/mihomo/releases/download/v1.x.y/mihomo-"
+                f"{go_os()}-{go_arch()}-v1.x.y.gz"
+            ) from exc
+        asset_name = kernel_asset_name(release)
+        if not asset_name:
+            tag = release.get("tag_name") or "?"
+            raise ProxyError(
+                f"{tag} 里没有适配 {go_os()}/{go_arch()} 的内核包。"
+                f"用 --url 手工指定，或设 YI_MIHOMO 指向已有的 mihomo。"
+            )
+        asset_url = next(
+            str(a.get("browser_download_url")) for a in release["assets"] if a.get("name") == asset_name
+        )
+
+    log.info("下载内核 %s", asset_name)
+    tmp = target + ".part"
+    try:
+        request = urllib.request.Request(asset_url, headers={"User-Agent": f"yi/{__version__}"})
+        with urllib.request.urlopen(request, timeout=120) as response, open(tmp, "wb") as out:
+            shutil.copyfileobj(response, out)
+
+        if asset_name.endswith(".gz"):
+            with gzip.open(tmp, "rb") as src, open(target, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+        elif asset_name.endswith(".zip"):
+            with zipfile.ZipFile(tmp) as archive:
+                member = next(
+                    (n for n in archive.namelist() if n.endswith("mihomo") or n.endswith("mihomo.exe")),
+                    None,
+                )
+                if not member:
+                    raise ProxyError(f"{asset_name} 里没找到可执行文件")
+                with archive.open(member) as src, open(target, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+        else:
+            shutil.move(tmp, target)
+    except (urllib.error.URLError, OSError, TimeoutError, gzip.BadGzipFile) as exc:
+        raise ProxyError(f"下载内核失败：{exc}") from exc
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+    os.chmod(target, 0o755)
+    return target
+
+
 def _port_open(port: int, host: str = "127.0.0.1", timeout: float = 1.0) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout):
@@ -238,9 +385,10 @@ def start(info: dict[str, Any] | None = None, port: int | None = None, label: st
     binary = mihomo_path()
     if not binary:
         raise ProxyError(
-            "找不到 mihomo 内核。放到 {}，或设 YI_MIHOMO 指向它。".format(
-                os.path.join(state.home_dir(), "bin", "mihomo")
-            )
+            "找不到代理内核 mihomo。\n"
+            "  ./yi fetch-kernel          自动下载一份（需要能访问 GitHub）\n"
+            f"  或者手工放到 {kernel_target_path()}，\n"
+            "  或者设 YI_MIHOMO 指向已有的 mihomo。"
         )
     if running_pid():
         stop()

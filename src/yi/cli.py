@@ -201,6 +201,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_proxy.add_argument("--json", action="store_true")
     p_proxy.set_defaults(func=cmd_proxy_status)
 
+    p_kernel = sub.add_parser("fetch-kernel", help="下载代理内核 mihomo（不入库，用到才取）")
+    p_kernel.add_argument("--url", help="直接给出压缩包地址（绕墙或指定版本时用）")
+    p_kernel.add_argument("--force", action="store_true", help="已存在也重新下载")
+    p_kernel.set_defaults(func=cmd_fetch_kernel)
+
     p_watch = sub.add_parser("watch", help="守护：竞价实例被回收后自动重建")
     p_watch.add_argument("--interval", type=float, default=60.0)
     p_watch.add_argument("--once", action="store_true", help="只检查一次")
@@ -1080,6 +1085,33 @@ def cmd_selftest(args) -> int:
         file=sys.stderr,
     )
     return 1
+
+
+def cmd_fetch_kernel(args) -> int:
+    """取一份代理内核。
+
+    内核（mihomo）有几十 MB、每个平台各一份，放仓库里会让项目胖几十倍，
+    所以改成用到时自己取。这也是 `connect` 之前唯一需要手工准备的东西。
+    """
+    existing = proxy.mihomo_path()
+    target = proxy.kernel_target_path()
+    if existing and not args.force:
+        print(f"内核已就绪：{existing}")
+        print("要重新下载就加 --force。")
+        return 0
+
+    print(f"目标位置：{target}")
+    print(f"平台架构：{proxy.go_os()}/{proxy.go_arch()}")
+    try:
+        path = proxy.fetch_kernel(url=args.url)
+    except proxy.ProxyError as exc:
+        print(f"\n{exc}", file=sys.stderr)
+        return 1
+
+    size = os.path.getsize(path)
+    print(f"\n完成：{path}（{size / 1024 / 1024:.1f} MB）")
+    print("接下来：./yi connect")
+    return 0
 
 
 def cmd_connect(args) -> int:

@@ -33,6 +33,18 @@ curl -sS https://api.ip.sb/ip                              # 直连的出口
 两个出口**不一样**才说明代理真的生效了。如果代理出口也不是服务器 IP，
 说明流量没进内核。
 
+## 报"找不到代理内核 mihomo"
+
+内核是单独下载的，不在仓库里：
+
+```bash
+./yi fetch-kernel
+```
+
+直连 GitHub 不通（国内常见）时，报错信息里会给出带镜像的完整命令，
+形如 `./yi fetch-kernel --url https://ghproxy.net/https://github.com/...`。
+已经有一份 mihomo 的话，也可以设 `YI_MIHOMO=/path/to/mihomo` 指过去。
+
 ## 报 `received real certificate`
 
 这是客户端在和**起点不是你的服务器**握手，或者服务端的 REALITY 没协商成功。
