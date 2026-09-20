@@ -34,7 +34,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-qr = ["qrcode>=7.4"]     # 只有需要生成二维码时才用到
+qr = ["qrcode>=8.2"]     # 只有需要生成二维码时才用到
 dev = ["ruff>=0.16"]
 
 [project.urls]
