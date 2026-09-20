@@ -19,13 +19,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 安装 uv 与 Python 3.12
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
 
       - name: 安装依赖
         run: |
-          uv venv --python 3.12
+          uv venv --python 3.12 --allow-existing
           uv pip install -e .
 
       - name: 打包 App
@@ -38,7 +38,7 @@ jobs:
           shasum -a 256 "Yi-${{ github.ref_name }}.zip" > "Yi-${{ github.ref_name }}.zip.sha256"
 
       - name: 发布
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/Yi-*.zip
