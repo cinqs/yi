@@ -143,6 +143,43 @@
   </section>
 
   <section>
+    <h2>分流：该直连的直连，该出去的出去</h2>
+    <p>
+      规则是分层的，顺序本身就是语义 —— 先把局域网摘出去，再按域名/地区判断，
+      最后才轮到兜底。默认接上社区维护的
+      <a href="https://github.com/Loyalsoldier/clash-rules">Loyalsoldier/clash-rules</a>：
+      12 个集合、约 34 万条规则，每天自动更新。
+    </p>
+    <div class="term">
+      <div class="o">局域网 / 本机 → 直连　<span class="p">（不这样做，访问 NAS 会绕到香港再回来）</span></div>
+      <div class="o">联网探测域名 → 直连　<span class="p">（否则系统会显示"连上了但没有互联网"）</span></div>
+      <div class="c">你自己的规则 → 直连 / 代理 / 拦截　<span class="p">← 优先级最高</span></div>
+      <div class="o">reject → 拦截</div>
+      <div class="o">direct / cncidr / icloud / apple → 直连</div>
+      <div class="o">proxy / gfw / greatfire / telegramcidr → 走代理</div>
+      <div class="o">GEOIP,CN → 直连　→　剩下的走代理</div>
+    </div>
+    <div class="grid three" style="margin-top:16px">
+      <div class="card">
+        <h3>规则集取不到也不断网</h3>
+        <p>实测过：规则集下载失败时内核<b>不会报错</b>，它照常启动。所以内置的局域网直连和
+          GEOIP 一直保留当保险 —— 也正因为它失败得这么安静，状态由
+          <code>./yi rules</code> 如实报出来，不靠猜。</p>
+      </div>
+      <div class="card">
+        <h3>镜像按国内可达性排</h3>
+        <p><code>raw.githubusercontent.com</code> 实测直接超时，所以依次试
+          jsdelivr / ghproxy 等镜像，必要时走你自己的代理去取，取回来落在本地缓存。</p>
+      </div>
+      <div class="card">
+        <h3>你自己那份不会被覆盖</h3>
+        <p>界面「规则」页可以直接增删自己的规则。社区规则集是<b>只读</b>的 ——
+          往里加东西下次更新就会被覆盖，与其让它静默失效，不如不给这个入口。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <h2>架构</h2>
     <div class="term">
       <div>驿.app（Swift + WKWebView，不到 1 MB）　<span class="p">← 只负责显示与点击</span></div>
@@ -173,13 +210,12 @@
     <div class="links">
       <a href="https://github.com/cinqs/yi/blob/main/docs/quickstart.md">快速开始</a>
       <a href="https://github.com/cinqs/yi/blob/main/docs/configuration.md">配置参考</a>
+      <a href="https://github.com/cinqs/yi/wiki">Wiki</a>
       <a href="https://github.com/cinqs/yi/blob/main/docs/architecture.md">架构与设计决策</a>
       <a href="https://github.com/cinqs/yi/blob/main/docs/lessons.md">踩坑记录</a>
-      <a href="https://github.com/cinqs/yi/blob/main/docs/design.md">界面设计系统</a>
       <a href="https://github.com/cinqs/yi/blob/main/docs/faq.md">常见问题</a>
       <a href="https://github.com/cinqs/yi/blob/main/docs/troubleshooting.md">故障排查</a>
       <a href="https://github.com/cinqs/yi/blob/main/docs/roadmap.md">路线图</a>
-      <a href="https://github.com/cinqs/yi/wiki">Wiki</a>
     </div>
   </section>
 
