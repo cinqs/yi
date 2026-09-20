@@ -51,6 +51,20 @@ RETRYABLE_CODES = {
 }
 
 
+# 所有阿里云 API 调用**一律不走系统代理**，三条理由：
+#
+#  1. 阿里云 API 本身在国内可达，走代理没有任何好处；
+#  2. 本地代理一旦停掉（用户点了"断开"、内核崩了），请求会变成
+#     `ECONNREFUSED` —— 而看门狗会把它误判成"实例被回收"，进而重建机器。
+#     这个坑真实发生过：日志里一串 Connection refused 后面紧跟着
+#     "第 N 次查不到实例（可能是竞价回收）"。
+#  3. 这些请求带着 AccessKey 签名，没有理由让它经过第三方代理。
+#
+# urllib 默认会读取 macOS 的系统代理设置并**缓存**下来（`build_opener` 只建一次），
+# 所以要显式用一个清空代理的 opener。
+_NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 class AliyunError(RuntimeError):
     """A structured error returned by the Alibaba Cloud gateway."""
 
@@ -257,7 +271,8 @@ class RpcClient:
                 method="POST",
             )
             try:
-                with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                # 用显式清空代理的 opener，理由见 _NO_PROXY_OPENER 上面那段
+                with _NO_PROXY_OPENER.open(request, timeout=self.timeout) as response:
                     payload = response.read().decode("utf-8", "replace")
                     status = response.getcode()
             except urllib.error.HTTPError as exc:

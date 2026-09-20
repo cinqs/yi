@@ -322,9 +322,17 @@ def running_pid() -> int | None:
     return pid
 
 
-def write_config(info: dict[str, Any], port: int = DEFAULT_MIXED_PORT, label: str = "HK-Spot") -> str:
+def write_config(info: dict[str, Any], port: int | None = None, label: str = "HK-Spot") -> str:
+    """写出内核配置。
+
+    `port=None` 时会用 `resolve_port()` —— 也就是**这个内核正在用的那个端口**，
+    而不是模块常量里的默认值。这个区别踩过一次：规则集更新时重新生成配置，
+    用了默认的 7897，重载后内核换到 7897 去监听，而系统代理还指着 7899
+    ——用户的网就这么断了。
+    """
     state.ensure_home()
     os.makedirs(proxy_dir(), mode=0o700, exist_ok=True)
+    port = resolve_port(port)
     # 控制接口走 unix socket：不占端口、不会和别的东西撞（状态查询/流量统计要用）
     config = state.load_config()
     yaml_text = configgen.render_mihomo(
@@ -537,6 +545,26 @@ def reconcile(service: str | None = None) -> dict[str, Any]:
         except ProxyError as exc:
             # 起不来就别把系统代理指过去——否则用户整机断网（踩过）
             log.error("启动内核失败：%s", exc)
+            if system_proxy_enabled():
+                with contextlib.suppress(ProxyError):
+                    set_system_proxy(False)
+                    actions.append("proxy-off")
+            actions.append("start-failed")
+            return {"want": want, "actions": actions}
+
+    # 进程活着 ≠ 在服务。踩过一次：更新规则集后重载配置，内核换了个端口监听，
+    # 进程还在（`running_pid()` 有值），但原来的端口上没人了 —— 系统代理指着
+    # 一个死端口，用户整机断网，而调和循环认为"一切正常"，什么都不做。
+    # 所以这里必须**真的探一次端口**，不能只看进程。
+    if not _port_open(resolve_port()):
+        log.warning("内核进程在，但端口 %d 没在监听——重启一次", resolve_port())
+        with contextlib.suppress(ProxyError):
+            stop()
+        try:
+            start(info, None, current.get("label") or "HK-Spot")
+            actions.append("restarted-dead-listener")
+        except ProxyError as exc:
+            log.error("重启内核失败：%s", exc)
             if system_proxy_enabled():
                 with contextlib.suppress(ProxyError):
                     set_system_proxy(False)

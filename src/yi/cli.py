@@ -1209,9 +1209,12 @@ def cmd_rules(args) -> int:
             autodetect=autodetect,
         )
 
-        if summary["fetched"] and args.no_reload:
+        # 注意：这里**不看 summary["fetched"]**。规则本来就已经是最新的时，
+        # 用户跑 --update 的意图仍然是"让它们现在生效"——只因为"没下载新东西"
+        # 就什么都不做，会变成"我明明更新了却没反应"。
+        if args.no_reload:
             print(_regenerate_kernel_config())
-        elif summary["fetched"]:
+        else:
             print(_push_rules_to_kernel())
 
         if summary["failed"]:
@@ -1549,12 +1552,20 @@ def cmd_watch(args) -> int:
             # 用**裸列表**判断"还在不在"。`DescribeInstanceStatus` 在某些 POP 上会忽略
             # InstanceIds 过滤、返回别的实例的状态（今天实测过），拿它做决策会误判。
             present: dict[str, Any] | None = None
+            reachable = True
             try:
                 present = ecs.find_in_listing(instance_id)
             except AliyunError as exc:
+                # **查失败 ≠ 实例没了**。以前这里会把网络错误也算成"查不到"，
+                # 于是 API 抖两下就判定"被回收"并重建——白花钱、白换 IP，
+                # 而用户只是"网抖了一下"。现在：控制面不可达就这一轮不动手，
+                # 也不重置计数（真被回收时前面攒的次数不该白费）。
                 log.warning("查询状态失败: %s", exc)
+                reachable = False
 
-            if present is None:
+            if not reachable:
+                pass
+            elif present is None:
                 missing += 1
                 log.warning("第 %d 次查不到实例 %s（可能是竞价回收）", missing, instance_id)
                 # 连续两次都查不到才动手，避免单次 API 抖动导致误重建
