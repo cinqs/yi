@@ -103,6 +103,7 @@ make app && open dist/Yi.app
 | `yi connect` / `disconnect` | 起停代理内核 + 系统代理 |
 | `yi fetch-kernel` | 下载代理内核 mihomo（不入库，用到才取；`--url` 可绕墙） |
 | `yi android` | 取一份 Android 客户端 APK（v2rayNG 官方原版） |
+| `yi rules` | 社区分流规则集：看状态 / `--update` 一键更新 |
 | `yi status` / `proxy-status` | 机器、连接、出口 IP |
 | `yi sub` | 重新生成客户端配置（v2rayNG 订阅 / Clash / sing-box） |
 | `yi selftest` | 在服务器上回环自测：自己当客户端连自己 |

@@ -36,6 +36,8 @@ class ReconcileTests(unittest.TestCase):
         proxy.set_desired_connected(want)
         if applied:
             proxy._set_applied_fingerprint(applied)
+        # 规则集的后台刷新要下几 MB，不该出现在"调和循环"的单元测试里
+        # （它自己的触发条件由 tests/test_rules.py 覆盖）。
         with (
             mock.patch.object(proxy, "running_pid", return_value=1 if running else None),
             mock.patch.object(proxy, "start") as start,
@@ -44,6 +46,7 @@ class ReconcileTests(unittest.TestCase):
             mock.patch.object(proxy, "set_system_proxy") as setter,
             mock.patch.object(proxy, "resolve_port", return_value=7897),
             mock.patch.object(proxy, "_port_open", return_value=True),
+            mock.patch.object(proxy, "_refresh_rules_if_stale", return_value=False),
         ):
             result = proxy.reconcile()
         return result, start, stop, setter

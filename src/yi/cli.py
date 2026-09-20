@@ -16,7 +16,7 @@ import urllib.request
 from datetime import UTC, datetime
 from typing import Any
 
-from . import __version__, android, configgen, identity, proxy, ssh, state
+from . import __version__, android, configgen, identity, proxy, rules, ssh, state
 from .aliyun import AlidnsClient, AliyunError, EcsClient, load_credentials
 from .bootstrap import render_user_data
 
@@ -222,6 +222,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_android.add_argument("--url", help="直接给出 APK 地址（绕墙或钉住版本时用）")
     p_android.add_argument("--dir", help="保存目录，默认 ~/Downloads/yi-android")
     p_android.set_defaults(func=cmd_android)
+
+    p_rules = sub.add_parser("rules", help="社区分流规则集：查看状态 / 一键更新")
+    p_rules.add_argument("--update", action="store_true", help="拉取（或刷新）全部规则集")
+    p_rules.add_argument("--force", action="store_true", help="还没过期也重新拉")
+    p_rules.add_argument("--mirror", help="只用这个镜像地址（默认按可达性顺序逐个试）")
+    p_rules.add_argument(
+        "--proxy",
+        nargs="?",
+        const="auto",
+        help="经代理去取（默认在内核运行时自动走它）",
+    )
+    p_rules.add_argument("--no-proxy", action="store_true", help="强制直连，不走代理")
+    p_rules.add_argument(
+        "--no-reload",
+        action="store_true",
+        help="更新后不要让正在跑的内核重读配置（配置会更新，下次连接才生效）",
+    )
+    p_rules.add_argument("--json", action="store_true")
+    p_rules.set_defaults(func=cmd_rules)
 
     p_watch = sub.add_parser("watch", help="守护：竞价实例被回收后自动重建")
     p_watch.add_argument("--interval", type=float, default=60.0)
@@ -763,6 +782,29 @@ def _finish_up(instance_state: dict[str, Any], config: dict[str, Any], args) -> 
     link = configgen.build_link(info, label)
     selftest = str(info.get("selftest") or "unknown").strip()
 
+    # 顺手把社区规则集取回来。这正是"一键"的意义：用户不需要知道 mihomo 还要
+    # 一份规则集才能正确分流。**失败不致命** —— 内置的基础规则一直都在，
+    # 所以这里只提示、不改变 `up` 的成败。
+    if config.get("ruleset_enabled", True) and rules.needs_update(config):
+        print("")
+        print("取社区规则集（国内直连 / 被墙站点分流，失败也不影响使用）…")
+        try:
+            summary = rules.fetch_all(
+                config,
+                progress=lambda msg: print(msg),
+                # 这时候内核还没起，直接走直连；镜像本身是可用的
+                autodetect=False,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"  跳过（{exc}）—— 稍后可以 ./yi rules --update")
+        else:
+            if summary["fetched"]:
+                print(f"  已取到 {len(summary['fetched'])} 个规则集，共 {summary['rules']} 条规则。")
+            if summary["failed"]:
+                print(
+                    "  有 {} 个没取到（其余可用）：./yi rules --update 可重试".format(len(summary["failed"]))
+                )
+
     print("")
     print("=== 就绪 ===")
     print("服务端: {}:{}".format(info["address"], info["port"]))
@@ -1102,6 +1144,127 @@ def cmd_selftest(args) -> int:
         file=sys.stderr,
     )
     return 1
+
+
+def _regenerate_kernel_config() -> str:
+    """只把内核配置重新生成一遍，不碰正在跑的进程。"""
+    current = state.load_state() or {}
+    if not current.get("server_info"):
+        return "还没有服务端信息 —— 下次 `./yi up`/`./yi connect` 会自动带上新规则。"
+    try:
+        proxy.write_config(_server_info_from_state(current))
+    except Exception as exc:  # noqa: BLE001 - 生成失败不影响"规则已经取回来"这个事实
+        return f"内核配置重新生成失败（{exc}）。"
+    return "配置已更新；按你的要求没有让内核重读，下次 `./yi connect` 生效。"
+
+
+def _push_rules_to_kernel() -> str:
+    """把刚取到的规则推给正在跑的内核，返回一句如实的说明。
+
+    **只重载是不够的**：内核跑着的那份配置可能是"还没有 rule-providers"的旧版本，
+    重载它等于什么都没做，却会对用户说"已生效"。所以顺序是：
+    先按当前参数重新生成配置，再让内核重读。
+    """
+    current = state.load_state() or {}
+    if not current.get("server_info"):
+        return "还没有服务端信息 —— 下次 `./yi up`/`./yi connect` 会自动带上新规则。"
+    try:
+        proxy.write_config(_server_info_from_state(current))
+    except Exception as exc:  # noqa: BLE001 - 生成失败不该影响"规则已经取回来"这个事实
+        return f"内核配置重新生成失败（{exc}）—— 下次 connect 会重试。"
+
+    if not proxy.running_pid():
+        return "内核没在跑；配置已更新，下次 `./yi connect` 生效。"
+    if rules.reload_running_kernel():
+        return "已重新生成配置并让内核重读，新规则立刻生效。"
+    return "配置已更新，但内核重载失败；下次 `./yi connect` 生效。"
+
+
+def cmd_rules(args) -> int:
+    """社区维护的分流规则集：看状态、一键更新。
+
+    为什么要单独一条命令：这些规则集挂在 GitHub 上，国内经常取不到；而取不到
+    时内核**不会报错**——它照样启动，只是那几条 RULE-SET 全都匹配不上。
+    表现是"规则配了但完全没生效"，查起来很费劲。所以状态得我们自己说清楚。
+    """
+    config = state.load_config()
+
+    if args.update:
+        if args.no_proxy:
+            proxy_url, autodetect = None, False
+        elif args.proxy and args.proxy != "auto":
+            proxy_url, autodetect = args.proxy, False
+        else:
+            proxy_url, autodetect = None, True
+
+        if args.mirror:
+            config = dict(config, ruleset_mirrors=[args.mirror])
+
+        print("正在取规则集…")
+        summary = rules.fetch_all(
+            config,
+            proxy=proxy_url,
+            force=args.force,
+            progress=lambda msg: print(msg),
+            autodetect=autodetect,
+        )
+
+        if summary["fetched"] and args.no_reload:
+            print(_regenerate_kernel_config())
+        elif summary["fetched"]:
+            print(_push_rules_to_kernel())
+
+        if summary["failed"]:
+            print("\n以下规则集没能取到（其余仍可用）：", file=sys.stderr)
+            for item in summary["failed"]:
+                print(f"  {item['name']}: {item['error']}", file=sys.stderr)
+            print(
+                "\n可以换个镜像再试：./yi rules --update --mirror <地址>\n"
+                "或者先连上代理：./yi connect && ./yi rules --update",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"\n完成：{len(summary['fetched'])} 个规则集，共 {summary['rules']} 条规则。")
+        return 0
+
+    # 不带 --update：只报状态
+    items = rules.status(config)
+    enabled = bool(config.get("ruleset_enabled", True))
+    if args.json:
+        _emit(
+            {
+                "enabled": enabled,
+                "dir": rules.ruleset_dir(),
+                "max_age_hours": rules.stale_hours(config),
+                "sets": items,
+                "needs_update": rules.needs_update(config),
+            },
+            args,
+        )
+        return 0
+
+    print(f"规则集目录：{rules.ruleset_dir()}")
+    print(
+        f"状态：{'启用' if enabled else '已关闭（只有内置基础规则）'}　"
+        f"过期阈值 {rules.stale_hours(config):.0f} 小时\n"
+    )
+    print(f"{'规则集':<14}{'条数':>8}{'大小':>10}  {'更新时间':<12} 行为")
+    for item in items:
+        if item["present"]:
+            age = f"{item['age_hours']:.0f} 小时前" if item["age_hours"] is not None else "-"
+            if item["age_hours"] is not None and item["age_hours"] > rules.stale_hours(config):
+                age += " ⚠"
+            size = f"{item['bytes'] / 1024:.0f} KB"
+            count = str(item["rules"])
+        else:
+            age, size, count = "缺失", "-", "-"
+        print(f"{item['name']:<14}{count:>8}{size:>10}  {age:<12} {item['behavior']}")
+
+    if rules.needs_update(config):
+        print("\n有规则集缺失或过期。取回来：./yi rules --update")
+    else:
+        print("\n都是新鲜的。要强制刷新就加 --force。")
+    return 0
 
 
 def cmd_fetch_kernel(args) -> int:

@@ -124,6 +124,40 @@ class ProfileTests(unittest.TestCase):
         self.assertNotIn("{", text)
         self.assertNotIn("\n\n\n", text)
 
+    def test_rule_providers_point_at_the_local_cache(self):
+        """`path` 是相对内核工作目录的 —— 写成绝对路径或者别的地方，
+        内核就会"文件明明在却说没有"。"""
+        text = configgen.render_mihomo(INFO)
+        self.assertIn("rule-providers:", text)
+        for rs in configgen.rules.RULE_SETS:
+            self.assertIn(f"  {rs.name}:", text)
+            self.assertIn(f"    behavior: {rs.behavior}", text)
+            self.assertIn(f"    path: ./ruleset/{rs.name}.yaml", text)
+        # 默认用第一个（实测可达的）镜像
+        self.assertIn(configgen.rules.DEFAULT_MIRRORS[0], text)
+
+    def test_rule_set_order_is_semantic(self):
+        """reject 要在最前、MATCH 要在最后 —— 顺序反了会让后面的规则永远轮不到。"""
+        rules_text = configgen.mihomo_rules()
+        rule_sets = [r for r in rules_text if "RULE-SET," in r]
+        self.assertTrue(rule_sets[0].startswith("  - RULE-SET,reject,REJECT"))
+        self.assertEqual(rules_text[-1], "  - MATCH,PROXY")
+        # 局域网直连必须排在所有 RULE-SET 之前：规则集没下下来时它是唯一保险
+        self.assertLess(
+            rules_text.index("  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve"),
+            rules_text.index(rule_sets[0]),
+        )
+
+    def test_rule_sets_can_be_turned_off(self):
+        """排查"是不是规则集的锅"时的退路，也是规则集功能本身的降级开关。"""
+        text = configgen.render_mihomo(INFO, use_rule_sets=False)
+        self.assertNotIn("rule-providers:", text)
+        self.assertNotIn("RULE-SET,", text)
+        # 关了之后内置基础规则必须还在
+        self.assertIn("  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve", text)
+        self.assertIn("  - GEOIP,CN,DIRECT", text)
+        self.assertEqual(configgen.mihomo_rules(use_rule_sets=False)[-1], "  - MATCH,PROXY")
+
     def test_write_profiles_are_private(self):
         tmp = tempfile.TemporaryDirectory()
         saved = os.environ.get("YI_HOME")

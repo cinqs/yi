@@ -19,6 +19,7 @@ import platform
 import shutil
 import socket
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -325,12 +326,15 @@ def write_config(info: dict[str, Any], port: int = DEFAULT_MIXED_PORT, label: st
     state.ensure_home()
     os.makedirs(proxy_dir(), mode=0o700, exist_ok=True)
     # 控制接口走 unix socket：不占端口、不会和别的东西撞（状态查询/流量统计要用）
+    config = state.load_config()
     yaml_text = configgen.render_mihomo(
         info,
         label,
         mixed_port=port,
         controller_socket=controller_socket(),
-        direct_domains=state.load_config().get("direct_domains"),
+        direct_domains=config.get("direct_domains"),
+        use_rule_sets=bool(config.get("ruleset_enabled", True)),
+        ruleset_interval_hours=int(config.get("ruleset_interval_hours") or 24),
     )
     state.write_private(config_path(), yaml_text, 0o600)
     return config_path()
@@ -370,6 +374,39 @@ def stat(query: str, timeout: float = 4.0) -> dict[str, Any] | None:
         return json.loads(completed.stdout)
     except ValueError:
         return None
+
+
+def api(
+    method: str,
+    path: str,
+    body: dict[str, Any] | None = None,
+    timeout: float = 5.0,
+) -> bool:
+    """对内核控制接口发一个请求（走 unix socket）。成功返回 True。"""
+    sock = controller_socket()
+    if not os.path.exists(sock):
+        return False
+    cmd = ["curl", "-sS", "--max-time", str(int(timeout)), "--unix-socket", sock, "-X", method]
+    if body is not None:
+        cmd += ["-H", "Content-Type: application/json", "-d", json.dumps(body)]
+    cmd.append("http://localhost" + path)
+    try:
+        completed = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 2)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return completed.returncode == 0
+
+
+def reload_config(timeout: float = 5.0) -> None:
+    """让正在跑的内核重新读一遍配置。
+
+    用途：规则集是内核启动**之后**才下下来的话，它内存里那份是空的，得让它重读。
+    `force=true` 是必须的 —— 不带它，内核发现配置路径没变就直接跳过了。
+    """
+    if not running_pid():
+        raise ProxyError("内核没在跑，不需要重载")
+    if not api("PUT", "/configs?force=true", {"path": config_path()}, timeout=timeout):
+        raise ProxyError("内核拒绝重载配置")
 
 
 def traffic() -> dict[str, Any]:
@@ -519,7 +556,50 @@ def reconcile(service: str | None = None) -> dict[str, Any]:
                 actions.append("proxy-on")
             except ProxyError as exc:
                 log.warning("系统代理没设上: %s", exc)
+
+    # 规则集更新**不算"状态纠正"**，所以不进 actions —— 那个列表是给界面展示
+    # "刚才修了什么"用的，塞进去只会让"一切正常"的轮次也显示有动作。
+    _refresh_rules_if_stale()
     return {"want": want, "actions": actions}
+
+
+# 刷新规则集这件事**不能在调和循环里同步做**：它要下载几 MB，会把 8 秒一轮的
+# 循环卡住，界面跟着一顿。所以扔给一个一次性线程，用一个锁防重入。
+_rules_refresh_lock = threading.Lock()
+
+
+def _refresh_rules_if_stale() -> bool:
+    """规则集缺失/过期时后台补一次。返回 True 表示确实派了活。"""
+    from . import rules  # 延迟导入：rules 又要在别处用 proxy，避免环形依赖
+
+    # 内核不在跑就不做：这时候既没有可用代理去取，取了也没人读。
+    # 等它起来，或者用户跑 ./yi rules --update。
+    if running_pid() is None:
+        return False
+    config = state.load_config()
+    if not config.get("ruleset_enabled", True) or not rules.needs_update(config):
+        return False
+    if not _rules_refresh_lock.acquire(blocking=False):
+        return False  # 上一轮还在下，别叠罗汉
+
+    def worker() -> None:
+        try:
+            # 内核正在跑，就走它去取——这是唯一一条"一定通"的路
+            summary = rules.fetch_all(config, progress=lambda m: log.info("%s", m))
+            if summary["fetched"]:
+                # 文件换了要让内核重读，否则它内存里那份还是旧的
+                with contextlib.suppress(ProxyError):
+                    reload_config()
+                log.info("规则集已更新：%d 个", len(summary["fetched"]))
+            if summary["failed"]:
+                log.warning("有 %d 个规则集没取到（内置基础规则仍在生效）", len(summary["failed"]))
+        except Exception as exc:  # noqa: BLE001 - 守护线程绝不能因为这事死掉
+            log.warning("规则集刷新失败: %s", exc)
+        finally:
+            _rules_refresh_lock.release()
+
+    threading.Thread(target=worker, name="yi-rules-refresh", daemon=True).start()
+    return True
 
 
 # --------------------------------------------------------------------------

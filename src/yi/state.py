@@ -110,6 +110,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "vless_flow": "xtls-rprx-vision",
     # 直连的域名后缀。见上面 DEFAULT_DIRECT_DOMAINS 里的说明。
     "direct_domains": list(DEFAULT_DIRECT_DOMAINS),
+    # 社区维护的分流规则集（Loyalsoldier/clash-rules）。
+    # 关掉它只剩内置的基础规则——排查"是不是规则集的锅"时用。
+    "ruleset_enabled": True,
+    # 镜像顺序。默认是国内实测可用的几个；留空数组则用内置默认顺序。
+    "ruleset_mirrors": [],  # 见 yi.rules.DEFAULT_MIRRORS
+    # 内核自己去更新的周期（小时）。写成 0 表示不主动更新，只用手动/本地那份。
+    "ruleset_interval_hours": 24,
+    # 本地缓存多久算过期（小时）。超过就由 `./yi rules --update` 或守护重取。
+    "ruleset_max_age_hours": 168,  # 一周
     # REALITY 的伪装目标（"偷证书"的对象）。硬性要求：
     #   1) 从香港可达，支持 TLS1.3 + HTTP/2；
     #   2) **证书链要短** —— REALITY 会把 dest 的真实证书链抓下来、替换签名后发给客户端，

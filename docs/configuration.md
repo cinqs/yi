@@ -80,6 +80,8 @@
 |---|---|---|
 | `mixed_port` | 自动 | 内核的 HTTP/SOCKS 混合端口。默认自动避让（7897 是 Clash Verge 的常用口，容易撞） |
 | `direct_domains` | 一长串国内域名 | 直连的域名后缀，见下 |
+| `ruleset_enabled` | `true` | 是否使用社区规则集，见下 |
+| `ruleset_mirrors` | 内置顺序 | 规则集的下载镜像，见下 |
 | `want_connected` | 自动 | **期望状态**：`true` 时调和循环会保证"应该连着"。你点连接/断开时由界面写入 |
 | `watch_enabled` | `true` | 后台守护：实例被回收后自动重建。**默认开**，这是这套方案值钱的地方 |
 | `sub_token` | 自动生成 | 手机订阅端点的随机 token，首次需要时生成 |
@@ -114,6 +116,47 @@ direct_domains = ["qq.com", "bilibili.com", "example.com"]
 > ⚠️ 直接改 `~/.config/yi/profiles/mihomo.yaml` 是没用的，下次 `yi sub`
 > 会把它覆盖掉。规则要改就改配置里的 `direct_domains`，或者改代码里的
 > `configgen.mihomo_rules()`。
+
+### 社区规则集
+
+上面那份手写清单覆盖不到长尾——`.cn` 之外还有一大批国内站点，而且每天都在变。
+所以默认还会挂上社区维护的规则集（[Loyalsoldier/clash-rules](
+https://github.com/Loyalsoldier/clash-rules)，12 个集合、30 多万条规则）：
+
+| 规则集 | 作用 |
+|---|---|
+| `reject` | 广告 / 追踪，直接拒掉 |
+| `private` `lancidr` | 局域网与本机 |
+| `icloud` `apple` | 苹果服务直连（否则推送、iCloud 会绕一圈） |
+| `google` `proxy` | 需要走代理的 |
+| `direct` | 明确该直连的 |
+| `cncidr` | 中国大陆 IP 段 |
+| `gfw` `greatfire` | 明确被墙的 |
+| `telegramcidr` | Telegram 的 IP 段（它不用域名） |
+
+```bash
+./yi rules              # 看状态：每个集合多少条、什么时候更新的
+./yi rules --update     # 一键更新（自动挑可用镜像，必要时代理出去取）
+```
+
+规则集在 `up` 成功之后会自动取一次，之后每 24 小时由内核自己更新；
+本地缓存超过 7 天没用上，后台守护会在连接可用时补一次。
+
+```toml
+ruleset_enabled = true          # 关掉就只剩内置基础规则（排查用）
+ruleset_interval_hours = 24     # 内核自己的更新周期
+ruleset_max_age_hours = 168     # 本地缓存多久算过期
+ruleset_mirrors = []            # 留空 = 用实测过的内置顺序
+```
+
+**为什么默认走镜像**：这些规则集挂在 GitHub 上，`raw.githubusercontent.com`
+实测直接超时。内置顺序是 cdn.jsdelivr.net → testingcf.jsdelivr.net →
+ghproxy.net → gh-proxy.com → 上游本体，逐个试到成功为止。
+国外或者连着代理时，上游本体反而最快，所以它排在最后而不是被删掉。
+
+**一个必须知道的行为**：规则集**取不到时内核不会报错**——它照样启动，只是
+那几条 `RULE-SET` 一条都匹配不上（实测确认）。好处是"规则集挂了"不会变成
+"你断网"；坏处是失败完全静默。所以状态由 `./yi rules` 自己说，别靠猜。
 
 ## 预算护栏
 

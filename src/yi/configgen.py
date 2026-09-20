@@ -13,7 +13,7 @@ import os
 from typing import Any
 from urllib.parse import quote
 
-from . import state
+from . import rules, state
 
 PROFILE_FILES = (
     "vless-link.txt",
@@ -79,20 +79,64 @@ def _domain_rules(domains) -> list[str]:
     return rules
 
 
-def mihomo_rules(direct_domains=None) -> list[str]:
+def mihomo_rules(direct_domains=None, use_rule_sets: bool = True) -> list[str]:
     """生成 mihomo 的 rules 段。抽出来是为了能被单独测试。
     `direct_domains` 为 None 时用内置名单；传空列表就是"不要额外直连域名"。
+
+    `use_rule_sets=False` 时不引用社区规则集，只剩内置那几条 —— 用于对照排查
+    （"关掉规则集还连不连得上"），也是规则集功能出问题时的退路。
     """
     if direct_domains is None:
         direct_domains = state.DEFAULT_DIRECT_DOMAINS
-    rules = [f"  - IP-CIDR,{c},DIRECT,no-resolve" for c in _DIRECT_CIDRS]
-    rules += [f"  - IP-CIDR6,{c},DIRECT,no-resolve" for c in _DIRECT_CIDRS6]
-    rules += [f"  - DOMAIN-SUFFIX,{d},DIRECT" for d in _PROBE_DOMAINS]
-    rules.append("  - DOMAIN-SUFFIX,cn,DIRECT")
-    rules += _domain_rules(direct_domains)
-    rules.append("  - GEOIP,CN,DIRECT")
-    rules.append("  - MATCH,PROXY")
-    return rules
+    # 顺序即语义，改之前先读 rules.RULE_TARGETS 上面的那段注释。
+    lines = [f"  - IP-CIDR,{c},DIRECT,no-resolve" for c in _DIRECT_CIDRS]
+    lines += [f"  - IP-CIDR6,{c},DIRECT,no-resolve" for c in _DIRECT_CIDRS6]
+    lines += [f"  - DOMAIN-SUFFIX,{d},DIRECT" for d in _PROBE_DOMAINS]
+
+    sets = dict(rules.RULE_TARGETS)
+    if use_rule_sets:
+        # 广告/追踪挡在最前：它命中的东西不该有机会落到别的规则上
+        lines.append(f"  - RULE-SET,reject,{sets['reject']}")
+        for name in ("private", "lancidr"):
+            lines.append(f"  - RULE-SET,{name},{sets[name]}")
+
+    # 国内域名排在这里是有意的：比社区的 proxy 列表更早命中，
+    # 免得某个国内站点被社区列表误判成"该走代理"。
+    lines.append("  - DOMAIN-SUFFIX,cn,DIRECT")
+    lines += _domain_rules(direct_domains)
+
+    if use_rule_sets:
+        for name in ("icloud", "apple", "google", "proxy", "direct", "cncidr"):
+            if name in sets:
+                lines.append(f"  - RULE-SET,{name},{sets[name]}")
+        for name in ("gfw", "greatfire", "telegramcidr"):
+            if name in sets:
+                lines.append(f"  - RULE-SET,{name},{sets[name]}")
+
+    lines.append("  - GEOIP,CN,DIRECT")
+    lines.append("  - MATCH,PROXY")
+    return lines
+
+
+def rule_providers_block(base_url: str, interval_hours: int = 24) -> str:
+    """生成 `rule-providers:` 段。
+
+    `path` 写的是相对路径 —— 内核按自己的工作目录（`mihomo -d`）解析，
+    所以缓存必须落在 `~/.config/yi/mihomo/ruleset/`（见 rules.ruleset_dir）。
+    """
+    interval = max(1, int(interval_hours)) * 3600
+    lines = ["rule-providers:"]
+    for rs in rules.RULE_SETS:
+        lines += [
+            f"  {rs.name}:",
+            "    type: http",
+            f"    behavior: {rs.behavior}",
+            "    format: yaml",
+            f'    url: "{base_url.rstrip("/")}/{rs.filename}"',
+            f"    path: ./ruleset/{rs.name}.yaml",
+            f"    interval: {interval}",
+        ]
+    return "\n".join(lines) + "\n"
 
 
 def build_link(info: dict[str, Any], label: str = "HK-Spot") -> str:
@@ -129,8 +173,16 @@ def render_mihomo(
     external_controller: str = "",
     controller_socket: str = "",
     direct_domains=None,
+    use_rule_sets: bool = True,
+    ruleset_base: str | None = None,
+    ruleset_interval_hours: int = 24,
 ) -> str:
-    rules = "\n".join(mihomo_rules(direct_domains))
+    rule_lines = "\n".join(mihomo_rules(direct_domains, use_rule_sets=use_rule_sets))
+    providers = (
+        rule_providers_block(ruleset_base or rules.DEFAULT_MIRRORS[0], ruleset_interval_hours)
+        if use_rule_sets
+        else ""
+    )
     fake_ip_filter = "\n".join(f"    - '{p}'" for p in _FAKE_IP_FILTER)
     # 控制接口两个都是可选的（命令行用 unix socket，独立客户端可能要 http）。
     # 拼成一块再插进去，避免为空时在文件里留下多余空行。
@@ -192,14 +244,15 @@ proxy-groups:
       - "{label}"
       - DIRECT
 
-rules:
-{rules}
+{providers}rules:
+{rule_lines}
 """.format(
         label=label,
         mixed_port=int(mixed_port),
         controller_block=controller_block,
         fake_ip_filter=fake_ip_filter,
-        rules=rules,
+        providers=providers,
+        rule_lines=rule_lines,
         address=info["address"],
         port=int(info["port"]),
         uuid=info["uuid"],

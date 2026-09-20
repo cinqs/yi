@@ -128,6 +128,18 @@ class KernelValidationTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, f"{result.stdout}\n{result.stderr}")
 
+    def test_kernel_accepts_rule_providers_even_when_the_files_are_missing(self):
+        """实测过的重要行为：规则集下载失败时内核**照样启动**，只是那几条
+        RULE-SET 匹配不上。这保证了"规则集挂了"不会变成"用户断网"，
+        代价是失败静默 —— 所以状态得由 ./yi rules 自己说。"""
+        result = self._render_and_test(mixed_port=7899, use_rule_sets=True)
+        self.assertEqual(result.returncode, 0, f"{result.stdout}\n{result.stderr}")
+        self.assertFalse(os.path.exists(os.path.join(self.data_dir, "ruleset")))
+
+    def test_kernel_accepts_the_profile_with_rule_sets_disabled(self):
+        result = self._render_and_test(mixed_port=7899, use_rule_sets=False)
+        self.assertEqual(result.returncode, 0, f"{result.stdout}\n{result.stderr}")
+
 
 if __name__ == "__main__":
     unittest.main()

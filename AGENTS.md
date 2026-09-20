@@ -65,6 +65,11 @@ Makefile 会自动退回用 `.venv`。
 10. **不自研 Android 客户端**。Android 端要做的是 `VpnService` + 内核集成 +
    证书管理一整套，自己重写只会更差。用 v2rayNG，我们只负责**把客户端交到
    用户手上**（`yi android` 取官方 APK + 生成订阅）。
+11. **规则集是增强，不是依赖**。社区规则集取不到时内核**不会报错**（实测：
+   照样启动，只是 `RULE-SET` 全都匹配不上）。所以内置的局域网直连 / `GEOIP,CN`
+   必须一直保留当保险；规则集的状态由 `./yi rules` 如实报告，不靠猜。
+    规则集的缓存路径是 `mihomo/ruleset/`，因为配置里写的是相对内核工作目录的
+   `path: ./ruleset/x.yaml` —— 换位置就是"文件明明在，内核却说没有"。
 
 ## 代码地图
 
@@ -77,6 +82,7 @@ Makefile 会自动退回用 `.venv`。
 | `src/yi/proxy.py` | mihomo 内核的获取与生命周期、系统代理开关、出口校验、流量采样 |
 | `src/yi/identity.py` | 凭据持久化（UUID + REALITY 密钥对）→ 重建后客户端不用重配 |
 | `src/yi/android.py` | 取 v2rayNG 官方 APK（**不自研 Android 客户端**，理由见下） |
+| `src/yi/rules.py` | 社区分流规则集：镜像选择、下载、缓存、过期判断 |
 | `src/yi/status.py` | **状态的唯一来源**：8 状态机 + `snapshot()` |
 | `src/yi/state.py` | `~/.config/yi` 下的配置与状态（含旧目录自动迁移） |
 | `app/agent.py` | 本地 HTTP + SSE 服务，界面唯一的后端 |
