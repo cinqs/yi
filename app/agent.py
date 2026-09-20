@@ -52,11 +52,12 @@ _PACKAGE_ROOT = _locate_package_root()
 if _PACKAGE_ROOT:
     sys.path.insert(0, _PACKAGE_ROOT)
 
-from yi import __version__, proxy, state, status  # noqa: E402
+from yi import __version__, proxy, rules, state, status  # noqa: E402
 from yi.cli import (  # noqa: E402
     cmd_connect,
     cmd_disconnect,
     cmd_down,
+    cmd_rules,
     cmd_selftest,
     cmd_up,
     cmd_watch,
@@ -536,6 +537,8 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         elif route == "/api/state":
             self._json(build_state())
+        elif route == "/api/rules":
+            self._json(rules_snapshot())
         elif route == "/icon.png":
             # 界面标题栏用同一枚图标（和 App 图标保持一套视觉）
             for name in ("icon-256.png", "icon-512.png", "icon-1024.png"):
@@ -573,6 +576,9 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/connect": self._connect,
                 "/api/disconnect": self._disconnect,
                 "/api/verify": self._verify,
+                "/api/rules/custom": self._rules_add,
+                "/api/rules/custom/delete": self._rules_delete,
+                "/api/rules/community/update": self._rules_update,
             }.get(route)
             if handler is None:
                 self._json({"error": "not found"}, 404)
@@ -636,6 +642,33 @@ class Handler(BaseHTTPRequestHandler):
 
     def _verify(self, payload: dict[str, Any]) -> None:
         self._json(proxy.verify(int(payload.get("port") or proxy.resolve_port())))
+
+    # ── 分流规则 ────────────────────────────────────────────────────────
+    # 用户只能增删**自己的**规则；社区规则集是只读的（上游维护，混进去下次
+    # 更新就被覆盖，只会变成"我明明加了却不生效"）。
+    def _rules_add(self, payload: dict[str, Any]) -> None:
+        items, rule = rules.add_custom_rule(str(payload.get("rule") or ""))
+        self._json({"ok": True, "rule": rule, "custom": items, "applied": apply_rules_change()})
+
+    def _rules_delete(self, payload: dict[str, Any]) -> None:
+        items, rule = rules.remove_custom_rule(str(payload.get("rule") or ""))
+        self._json({"ok": True, "rule": rule, "custom": items, "applied": apply_rules_change()})
+
+    def _rules_update(self, payload: dict[str, Any]) -> None:
+        """一键更新社区规则集。耗时下载扔到后台，界面靠事件流看进度。"""
+        if RUNTIME.busy:
+            raise RuntimeError("正在忙别的，等它做完再更新规则集")
+        args = argparse.Namespace(
+            update=True,
+            force=bool(payload.get("force")),
+            mirror=None,
+            proxy=None,
+            no_proxy=False,
+            no_reload=False,
+            json=False,
+        )
+        RUNTIME.run("rules", lambda: cmd_rules(args))
+        self._json({"ok": True})
 
     def _serve_sub_qr(self) -> None:
         """手机订阅二维码。装了 qrcode 才提供，没有就让界面显示纯文本地址。"""
@@ -712,6 +745,48 @@ def _update_config(payload: dict[str, Any]) -> dict[str, Any]:
         config["budget"] = budget
     state.save_config(config)
     return {key: config.get(key) for key in sorted(allowed)} | {"budget": config.get("budget")}
+
+
+def rules_snapshot() -> dict[str, Any]:
+    """界面「规则」页要的全部东西：自己的规则 + 社区规则集的状态。"""
+    config = state.load_config()
+    targets = dict(rules.RULE_TARGETS)
+    return {
+        "enabled": bool(config.get("ruleset_enabled", True)),
+        "dir": rules.ruleset_dir(),
+        "max_age_hours": rules.stale_hours(config),
+        "interval_hours": int(config.get("ruleset_interval_hours") or 24),
+        "needs_update": rules.needs_update(config),
+        # 界面上的下拉选项由后端给，免得两边各写一份、改一边忘一边
+        "types": [{"name": name, "hint": hint} for name, hint in rules.CUSTOM_TYPES],
+        "actions": [{"name": name, "hint": hint} for name, hint in rules.CUSTOM_ACTIONS],
+        "custom": rules.custom_rules(config),
+        "community": [{**item, "target": targets.get(item["name"], "")} for item in rules.status(config)],
+    }
+
+
+def apply_rules_change() -> str:
+    """规则改了就让内核立刻用上，返回一句人话。
+
+    **重新生成配置时必须用 resolve_port()**，也就是这台机器正在用的端口 ——
+    这里踩过一次：用了默认端口 7897 而实际在 7899，重载后内核换了端口监听，
+    系统代理还指着旧端口，用户的网直接断了。
+    """
+    current = state.load_state() or {}
+    info = current.get("server_info")
+    if not info:
+        return "还没有服务端信息，等机器就绪后会自动带上"
+    try:
+        proxy.write_config(info, label=current.get("label") or "HK-Spot")
+    except Exception as exc:  # noqa: BLE001 - 生成失败不该让"规则已保存"变成报错
+        return f"规则已保存，但内核配置生成失败：{exc}"
+    if not proxy.running_pid():
+        return "已保存，下次连接生效"
+    try:
+        proxy.reload_config()
+    except Exception as exc:  # noqa: BLE001
+        return f"已保存，但内核重载失败：{exc}"
+    return "已生效"
 
 
 def _pick_port(preferred: int) -> int:

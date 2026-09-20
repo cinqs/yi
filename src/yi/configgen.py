@@ -79,12 +79,19 @@ def _domain_rules(domains) -> list[str]:
     return rules
 
 
-def mihomo_rules(direct_domains=None, use_rule_sets: bool = True) -> list[str]:
+def mihomo_rules(
+    direct_domains=None,
+    use_rule_sets: bool = True,
+    custom_rules=None,
+) -> list[str]:
     """生成 mihomo 的 rules 段。抽出来是为了能被单独测试。
     `direct_domains` 为 None 时用内置名单；传空列表就是"不要额外直连域名"。
 
     `use_rule_sets=False` 时不引用社区规则集，只剩内置那几条 —— 用于对照排查
     （"关掉规则集还连不连得上"），也是规则集功能出问题时的退路。
+
+    `custom_rules` 是用户自己加的规则，**排得最靠前**（仅次于内置的局域网直连）：
+    用户明确说了"这个域名要走代理/要拦掉"，那就不该被任何社区列表覆盖掉。
     """
     if direct_domains is None:
         direct_domains = state.DEFAULT_DIRECT_DOMAINS
@@ -92,6 +99,8 @@ def mihomo_rules(direct_domains=None, use_rule_sets: bool = True) -> list[str]:
     lines = [f"  - IP-CIDR,{c},DIRECT,no-resolve" for c in _DIRECT_CIDRS]
     lines += [f"  - IP-CIDR6,{c},DIRECT,no-resolve" for c in _DIRECT_CIDRS6]
     lines += [f"  - DOMAIN-SUFFIX,{d},DIRECT" for d in _PROBE_DOMAINS]
+    for rule in custom_rules or ():
+        lines.append(f"  - {rule}")
 
     sets = dict(rules.RULE_TARGETS)
     if use_rule_sets:
@@ -176,8 +185,11 @@ def render_mihomo(
     use_rule_sets: bool = True,
     ruleset_base: str | None = None,
     ruleset_interval_hours: int = 24,
+    custom_rules=None,
 ) -> str:
-    rule_lines = "\n".join(mihomo_rules(direct_domains, use_rule_sets=use_rule_sets))
+    rule_lines = "\n".join(
+        mihomo_rules(direct_domains, use_rule_sets=use_rule_sets, custom_rules=custom_rules)
+    )
     providers = (
         rule_providers_block(ruleset_base or rules.DEFAULT_MIRRORS[0], ruleset_interval_hours)
         if use_rule_sets

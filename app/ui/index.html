@@ -264,9 +264,34 @@
     border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
     font-size: 13px; transition: border-color .16s, box-shadow .16s;
   }
+  select {
+    width: 100%; padding: 9px 12px; border-radius: var(--r-sm);
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+    font-size: 13px; font-family: inherit;
+  }
+  select:hover { border-color: #333b4a; }
   input:focus { outline: none; border-color: rgba(91,140,255,.6);
                 box-shadow: 0 0 0 3px rgba(91,140,255,.13); }
   input:hover:not(:focus) { border-color: #333b4a; }
+
+  /* ---------------------------------------------------------------
+     规则页
+     --------------------------------------------------------------- */
+  button.btn.tiny { padding: 5px 11px; font-size: 12px; border-radius: 8px; gap: 5px; }
+  button.btn.tiny svg { width: 12px; height: 12px; }
+  .rule-item { display: flex; align-items: center; justify-content: space-between;
+               gap: 12px; padding: 9px 0; }
+  .rule-item + .rule-item { border-top: 1px solid var(--line-soft); }
+  .rule-item code { font-size: 12.5px; color: var(--text); word-break: break-all; }
+  .rule-item .tag { font-size: 10.5px; letter-spacing: .06em; padding: 2px 7px;
+                    border-radius: 6px; border: 1px solid var(--line);
+                    color: var(--text-dim); margin-right: 9px; }
+  .rule-item .tag.DIRECT { color: #8fd4ff; border-color: rgba(91,140,255,.32); }
+  .rule-item .tag.PROXY  { color: var(--brand); border-color: rgba(61,220,151,.32); }
+  .rule-item .tag.REJECT { color: #ffb3b3; border-color: rgba(255,107,107,.3); }
+  .empty { color: var(--text-faint); font-size: 12.5px; padding: 14px 0; }
+  .rs-meta { font-size: 11.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+  .hint { color: var(--text-dim); font-size: 12.5px; line-height: 1.65; margin: 0; }
 
   /* ---------------------------------------------------------------
      弹窗 / 提示
@@ -407,6 +432,7 @@
   <nav>
     <button data-tab="connect" class="active">连接</button>
     <button data-tab="machine">机器</button>
+    <button data-tab="rules">规则</button>
     <button data-tab="settings">设置</button>
   </nav>
 
@@ -534,6 +560,54 @@
     <div class="card">
       <span class="micro">后端日志</span>
       <div id="log"></div>
+    </div>
+  </section>
+
+  <section id="tab-rules" class="hide">
+    <div class="card">
+      <span class="micro">我的规则</span>
+      <p class="hint" style="margin:8px 0 4px">
+        只影响这台电脑，优先级最高（仅次于局域网直连）。
+        社区规则集是上游维护的，这里不往里加东西——加了下次更新也会被覆盖。
+      </p>
+      <div class="form">
+        <div class="field">
+          <label class="micro">匹配方式</label>
+          <select id="rule-type"></select>
+        </div>
+        <div class="field">
+          <label class="micro">动作</label>
+          <select id="rule-action"></select>
+        </div>
+        <div class="field wide">
+          <label class="micro">值</label>
+          <input type="text" id="rule-value" placeholder="example.com" autocomplete="off">
+        </div>
+      </div>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="btn" id="btn-rule-add"><svg><use href="#i-check"/></svg>添加</button>
+      </div>
+      <div id="rule-list"></div>
+    </div>
+
+    <div class="card">
+      <span class="micro">社区规则集 · 只读</span>
+      <div class="row">
+        <span class="k">来源</span>
+        <span class="v">Loyalsoldier/clash-rules</span>
+      </div>
+      <div class="row">
+        <span class="k">缓存位置</span>
+        <span class="v mono" id="rs-dir">—</span>
+      </div>
+      <div class="row">
+        <span class="k">状态</span>
+        <span class="v" id="rs-status">—</span>
+      </div>
+      <div id="rs-list" style="margin-top:6px"></div>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="btn" id="btn-rs-update"><svg><use href="#i-refresh"/></svg>更新规则集</button>
+      </div>
     </div>
   </section>
 
@@ -943,6 +1017,8 @@ async function post(path, body, okMessage) {
     toast("请求没发出去：" + e.message, "err");
   }
   refresh();
+  // 规则类的接口改完要让界面上的列表跟着变
+  if (path.indexOf("/api/rules") === 0) loadRules();
 }
 
 function verifyExit() {
@@ -955,15 +1031,107 @@ function verifyExit() {
 }
 
 /* ---------- 交互 ---------- */
+/* ---------- 规则页 ---------- */
+let rulesData = null;
+
+const ACTION_LABEL = { DIRECT: "直连", PROXY: "代理", REJECT: "拦截" };
+
+function ruleRow(rule) {
+  const action = rule.split(",").pop();
+  const tag = ACTION_LABEL[action] || action;
+  return `<div class="rule-item">
+    <code><span class="tag ${action}">${tag}</span>${rule}</code>
+    <button class="btn tiny danger" data-rule-del="${rule.replace(/"/g, "&quot;")}">删除</button>
+  </div>`;
+}
+
+function renderRules() {
+  if (!rulesData) return;
+  const d = rulesData;
+
+  // 下拉选项来自后端：两边各写一份的话，改一边忘一边就会出现"界面能选但内核不认"
+  const typeSel = need("rule-type"), actSel = need("rule-action");
+  if (!typeSel.options.length) {
+    d.types.forEach((t) => typeSel.add(new Option(t.hint + "（" + t.name + "）", t.name)));
+    d.actions.forEach((a) => actSel.add(new Option(a.hint + "（" + a.name + "）", a.name)));
+    actSel.value = "DIRECT";
+  }
+
+  const list = need("rule-list");
+  if (!d.custom.length) {
+    list.innerHTML = `<div class="empty">还没有自己的规则。上面填一条试试，
+      比如匹配方式选「匹配域名后缀」、值填 <code>example.com</code>、动作选「直连」。</div>`;
+  } else {
+    list.innerHTML = d.custom.map(ruleRow).join("");
+    list.querySelectorAll("[data-rule-del]").forEach((btn) => {
+      btn.onclick = () => post("/api/rules/custom/delete",
+        { rule: btn.dataset.ruleDel }, "已删除");
+    });
+  }
+
+  need("rs-dir").textContent = d.dir;
+  const missing = d.community.filter((x) => !x.present).length;
+  need("rs-status").textContent = !d.enabled ? "已关闭（只用内置基础规则）"
+    : d.needs_update ? (missing ? `有 ${missing} 个缺失，需要更新` : "已过期，需要更新")
+    : "已就绪";
+  need("rs-status").style.color = (!d.enabled || !d.needs_update)
+    ? "var(--text-dim)" : "var(--warn)";
+
+  need("rs-list").innerHTML = d.community.map((x) => {
+    const right = x.present
+      ? `<span class="rs-meta">${x.rules.toLocaleString()} 条 · ${(x.bytes / 1024).toFixed(0)} KB ·
+         ${x.age_hours < 1 ? "刚刚" : x.age_hours.toFixed(0) + " 小时前"}</span>`
+      : `<span class="rs-meta" style="color:var(--warn)">未下载</span>`;
+    return `<div class="row"><span class="k mono">${x.name} → ${x.target}</span>${right}</div>`;
+  }).join("");
+}
+
+async function loadRules() {
+  try {
+    const r = await fetch("/api/rules?t=" + Date.now());
+    rulesData = await r.json();
+    renderRules();
+  } catch (e) {
+    toast("读规则失败", "err");
+  }
+}
+
 document.querySelectorAll("nav button").forEach((btn) => {
   btn.onclick = () => {
     document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b === btn));
-    ["connect", "machine", "settings"].forEach((tab) =>
+    ["connect", "machine", "rules", "settings"].forEach((tab) =>
       need("tab-" + tab).classList.toggle("hide", tab !== btn.dataset.tab));
     need("tab-" + btn.dataset.tab).classList.add("fadein");
     setTimeout(() => need("tab-" + btn.dataset.tab).classList.remove("fadein"), 320);
+    // 规则页不在 SSE 状态里推（它不是"机器状态"），打开时现取一次
+    if (btn.dataset.tab === "rules") loadRules();
   };
 });
+
+need("btn-rule-add").onclick = async () => {
+  const kind = need("rule-type").value, action = need("rule-action").value;
+  const value = need("rule-value").value.trim();
+  if (!value) { toast("先填「值」", "err"); return; }
+  const btn = need("btn-rule-add");
+  btn.disabled = true;
+  try {
+    const r = await fetch("/api/rules/custom", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rule: `${kind},${value},${action}` }),
+    });
+    const v = await r.json();
+    if (!v.ok) { toast(v.error || "添加失败", "err"); return; }
+    need("rule-value").value = "";
+    toast(`已添加：${v.rule}${v.applied ? " · " + v.applied : ""}`, "ok");
+    loadRules();
+  } catch (e) {
+    toast("添加失败", "err");
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+need("btn-rs-update").onclick = () => post("/api/rules/community/update", {}, "开始更新规则集");
 
 need("btn-connect").onclick = () => {
   const running = lastState && lastState.connection && lastState.connection.running;

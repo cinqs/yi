@@ -158,6 +158,27 @@ class ProfileTests(unittest.TestCase):
         self.assertIn("  - GEOIP,CN,DIRECT", text)
         self.assertEqual(configgen.mihomo_rules(use_rule_sets=False)[-1], "  - MATCH,PROXY")
 
+    def test_custom_rules_outrank_the_community_sets(self):
+        """用户明确说"这个要走代理/要拦掉"，就不该被任何社区列表盖掉。"""
+        rules_text = configgen.mihomo_rules(
+            custom_rules=["DOMAIN,ads.example,REJECT", "DOMAIN-SUFFIX,corp.example,DIRECT"]
+        )
+        first_set = next(i for i, r in enumerate(rules_text) if "RULE-SET," in r)
+        for rule in ("  - DOMAIN,ads.example,REJECT", "  - DOMAIN-SUFFIX,corp.example,DIRECT"):
+            self.assertIn(rule, rules_text)
+            self.assertLess(rules_text.index(rule), first_set)
+        # 但局域网直连仍然排在更前面 —— 那是永不失效的保险
+        self.assertLess(
+            rules_text.index("  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve"),
+            rules_text.index("  - DOMAIN,ads.example,REJECT"),
+        )
+
+    def test_custom_rules_survive_turning_rule_sets_off(self):
+        """社区规则集关掉时，自己的规则必须还在。"""
+        rules_text = configgen.mihomo_rules(use_rule_sets=False, custom_rules=["DOMAIN,ads.example,REJECT"])
+        self.assertIn("  - DOMAIN,ads.example,REJECT", rules_text)
+        self.assertNotIn("RULE-SET,", " ".join(rules_text))
+
     def test_write_profiles_are_private(self):
         tmp = tempfile.TemporaryDirectory()
         saved = os.environ.get("YI_HOME")

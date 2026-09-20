@@ -26,7 +26,7 @@ import urllib.request
 import zipfile
 from typing import Any
 
-from . import __version__, configgen, state
+from . import __version__, configgen, rules, state
 
 log = logging.getLogger("yi.proxy")
 
@@ -343,6 +343,7 @@ def write_config(info: dict[str, Any], port: int | None = None, label: str = "HK
         direct_domains=config.get("direct_domains"),
         use_rule_sets=bool(config.get("ruleset_enabled", True)),
         ruleset_interval_hours=int(config.get("ruleset_interval_hours") or 24),
+        custom_rules=rules.custom_rules(config),
     )
     state.write_private(config_path(), yaml_text, 0o600)
     return config_path()

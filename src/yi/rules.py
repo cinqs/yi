@@ -301,3 +301,111 @@ def reload_running_kernel(timeout: float = 5.0) -> bool:
     except Exception as exc:  # noqa: BLE001 - 重载失败不该影响取规则集这件正事
         log.info("内核重载失败（不影响规则集本身）：%s", exc)
         return False
+
+
+# --------------------------------------------------------------------------
+# 用户自己的规则
+#
+# 只让用户**增删自己的**，不允许往社区规则集里塞东西 —— 那些是上游维护的，
+# 混进去之后既没人 review，下次更新也会被覆盖，只会变成"我明明加了却不生效"。
+# --------------------------------------------------------------------------
+
+# 界面上给用户选的类型。都对应 mihomo 原生规则，不自己发明语法。
+CUSTOM_TYPES = (
+    ("DOMAIN", "精确匹配域名"),
+    ("DOMAIN-SUFFIX", "匹配域名后缀"),
+    ("DOMAIN-KEYWORD", "匹配域名关键字"),
+    ("IP-CIDR", "匹配 IP 网段"),
+    ("GEOIP", "匹配国家/地区"),
+)
+CUSTOM_ACTIONS = (
+    ("DIRECT", "直连"),
+    ("PROXY", "走代理"),
+    ("REJECT", "拦截"),
+)
+_VALID_TYPES = {name for name, _ in CUSTOM_TYPES}
+_VALID_ACTIONS = {name for name, _ in CUSTOM_ACTIONS}
+
+
+def custom_rules(config: dict[str, Any] | None = None) -> list[str]:
+    cfg = config if config is not None else state.load_config()
+    value = cfg.get("custom_rules")
+    if isinstance(value, (list, tuple)):
+        return [str(item) for item in value]
+    return []
+
+
+def validate_custom_rule(text: str) -> str:
+    """把用户输入的一条规则校验并归一化成 mihomo 语法。
+
+    校验放在这里而不是界面里：界面、命令行、以后可能的别处都要用同一套规则，
+    校验逻辑散开就会出现"界面拦住了但 CLI 放过去"这种事。
+    """
+    raw = str(text or "").strip()
+    if not raw:
+        raise RulesError("规则不能为空")
+    if "," not in raw:
+        raise RulesError("规则要写成「类型,值,动作」，例如 DOMAIN-SUFFIX,example.com,DIRECT")
+
+    parts = [p.strip() for p in raw.split(",")]
+    # IP-CIDR 允许写法里带 no-resolve，这时是四段
+    no_resolve = bool(parts and parts[-1].lower() == "no-resolve")
+    if no_resolve:
+        parts.pop()
+    if len(parts) != 3:
+        raise RulesError("规则要写成「类型,值,动作」三段，例如 DOMAIN-SUFFIX,example.com,DIRECT")
+
+    kind, value, action = parts[0].upper(), parts[1], parts[2].upper()
+    if kind not in _VALID_TYPES:
+        raise RulesError(f"不认识的类型 {parts[0]}，可选：{'、'.join(sorted(_VALID_TYPES))}")
+    if action not in _VALID_ACTIONS:
+        raise RulesError(f"不认识的动作 {parts[2]}，可选：{'、'.join(sorted(_VALID_ACTIONS))}")
+    if not value:
+        raise RulesError("值不能为空")
+    if any(ch.isspace() for ch in value):
+        raise RulesError("值里不能有空格")
+
+    # 域名一律小写：DNS 不区分大小写，留着大小写只会让"看起来一样的规则"不重复
+    if kind.startswith("DOMAIN"):
+        value = value.lower().lstrip(".")
+
+    rule = f"{kind},{value},{action}"
+    # IP-CIDR 不带 no-resolve 时，内核会为了匹配而多做一次 DNS 解析，
+    # 在 fake-ip 下解析到的是假地址，纯属白费——所以默认替用户带上。
+    if kind == "IP-CIDR" and action == "DIRECT":
+        rule += ",no-resolve"
+    return rule
+
+
+def save_custom_rules(items: list[str]) -> list[str]:
+    config = state.load_config()
+    config["custom_rules"] = list(items)
+    state.save_config(config)
+    return list(items)
+
+
+def add_custom_rule(text: str) -> tuple[list[str], str]:
+    """加一条。返回 ``(全部规则, 归一化后的这条)``。重复的不再加。"""
+    rule = validate_custom_rule(text)
+    items = custom_rules()
+    if rule in items:
+        raise RulesError(f"已经有这条规则了：{rule}")
+    items.append(rule)
+    return save_custom_rules(items), rule
+
+
+def remove_custom_rule(text: str) -> tuple[list[str], str]:
+    target = str(text or "").strip()
+    items = custom_rules()
+    if target not in items:
+        # 也允许用"归一化之后相等"来删，避免用户手打时大小写不一致删不掉
+        try:
+            normalized = validate_custom_rule(target)
+        except RulesError:
+            normalized = target
+        if normalized in items:
+            target = normalized
+        else:
+            raise RulesError("找不到这条规则（可能已经被删掉了）")
+    items.remove(target)
+    return save_custom_rules(items), target

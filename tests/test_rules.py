@@ -217,5 +217,86 @@ class AutoRefreshTriggerTests(IsolatedHome):
             fetch.assert_not_called()
 
 
+class CustomRuleTests(IsolatedHome):
+    """用户自己的规则：只增删自己的，不碰社区规则集。
+
+    校验放在后端而不是界面里，是因为界面、命令行都要用同一套 —— 校验散开就会
+    出现"界面拦住了但 CLI 放过去"，然后内核收到一条它不认识的规则。
+    """
+
+    def test_normalizes_case_and_leading_dot(self):
+        self.assertEqual(
+            rules.validate_custom_rule("domain-suffix, .Example.COM , direct"),
+            "DOMAIN-SUFFIX,example.com,DIRECT",
+        )
+
+    def test_ip_cidr_direct_gets_no_resolve(self):
+        """不带 no-resolve 时内核会为了匹配多做一次 DNS 解析，假地址纯属白费。"""
+        self.assertEqual(
+            rules.validate_custom_rule("IP-CIDR,10.0.0.0/8,DIRECT"),
+            "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
+        )
+        # 走代理的不加：那条规则本来就要靠真域名去连
+        self.assertEqual(
+            rules.validate_custom_rule("IP-CIDR,1.2.3.0/24,PROXY"),
+            "IP-CIDR,1.2.3.0/24,PROXY",
+        )
+
+    def test_accepts_an_already_no_resolve_rule(self):
+        self.assertEqual(
+            rules.validate_custom_rule("IP-CIDR,10.0.0.0/8,DIRECT,no-resolve"),
+            "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
+        )
+
+    def test_rejects_the_shapes_that_would_silently_do_nothing(self):
+        for bad in (
+            "",
+            "example.com",  # 少了类型和动作
+            "DOMAIN-SUFFIX,example.com",  # 两段
+            "DOMAIN-SUFFIX,example.com,ALLOW",  # 动作不认识
+            "MAGIC,example.com,DIRECT",  # 类型不认识
+            "DOMAIN-SUFFIX,,DIRECT",  # 值空
+            "DOMAIN-SUFFIX,exa mple.com,DIRECT",  # 值里有空格
+        ):
+            with self.subTest(bad=bad):
+                with self.assertRaises(rules.RulesError):
+                    rules.validate_custom_rule(bad)
+
+    def test_add_remove_round_trip_persists(self):
+        self.assertEqual(rules.custom_rules(), [])
+        items, added = rules.add_custom_rule("DOMAIN,ads.example,REJECT")
+        self.assertEqual(items, ["DOMAIN,ads.example,REJECT"])
+        self.assertEqual(added, "DOMAIN,ads.example,REJECT")
+        # 落盘了没有？重新读一次配置
+        self.assertEqual(rules.custom_rules(), ["DOMAIN,ads.example,REJECT"])
+
+        items, removed = rules.remove_custom_rule("DOMAIN,ads.example,REJECT")
+        self.assertEqual(items, [])
+        self.assertEqual(removed, "DOMAIN,ads.example,REJECT")
+        self.assertEqual(rules.custom_rules(), [])
+
+    def test_duplicates_are_refused(self):
+        rules.add_custom_rule("DOMAIN-SUFFIX,example.com,DIRECT")
+        with self.assertRaises(rules.RulesError):
+            # 大小写不同但归一化之后是同一条，也不该重复加
+            rules.add_custom_rule("domain-suffix,Example.com,direct")
+
+    def test_removing_something_that_is_not_there_says_so(self):
+        with self.assertRaises(rules.RulesError):
+            rules.remove_custom_rule("DOMAIN,never.example,DIRECT")
+
+    def test_removal_accepts_a_non_normalized_form(self):
+        rules.add_custom_rule("DOMAIN-SUFFIX,Example.com,DIRECT")
+        items, _ = rules.remove_custom_rule("domain-suffix,EXAMPLE.com,direct")
+        self.assertEqual(items, [])
+
+    def test_custom_rules_are_not_rule_sets(self):
+        """社区的 12 个集合是只读的：用户加的规则不该混进 RULE_SETS。"""
+        rules.add_custom_rule("DOMAIN,ads.example,REJECT")
+        names = {rs.name for rs in rules.RULE_SETS}
+        self.assertNotIn("ads.example", names)
+        self.assertEqual(len(rules.RULE_SETS), 12)
+
+
 if __name__ == "__main__":
     unittest.main()
