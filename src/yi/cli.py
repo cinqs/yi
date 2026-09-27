@@ -270,6 +270,18 @@ IP_ECHO_URLS = (
 
 _IPV4_RE = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b")
 
+# 探测"本机公网 IP"必须**绕开系统代理**，两个原因，第二个是真实踩到的：
+#
+#   1. 语义上就不对。走代理出去，echo 服务看到的是**代理的出口 IP**（也就是
+#      香港那台机器），于是 SSH 白名单会加到一个跟用户毫无关系的地址上。
+#   2. 时机上最致命。竞价被回收时，本机代理恰恰是挂着的（服务端都没了），
+#      请求发往一个死端口 → 探测失败 → 重建时加不上白名单 → SSH 进不去 →
+#      "等待服务端就绪"永远等不到，界面卡在"安装中"。
+#      而这正是这套方案**最核心的场景**。
+#
+# 和 aliyun.py 里控制面不走代理是同一条理由：控制面不该依赖数据面。
+_NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def _extract_ipv4(text: str) -> str | None:
     """Pull the first usable public IPv4 out of whatever the echo service returned."""
@@ -290,7 +302,7 @@ def _my_public_ip(timeout: float = 6.0) -> str | None:
     for url in IP_ECHO_URLS:
         try:
             request = urllib.request.Request(url, headers={"User-Agent": "curl/8"})
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            with _NO_PROXY_OPENER.open(request, timeout=timeout) as response:
                 body = response.read().decode("utf-8", "replace")
         except Exception:  # noqa: BLE001 - any failure just means "try the next one"
             log.debug("公网 IP 探测失败: %s", url)
@@ -323,6 +335,38 @@ def _public_ip_via_dns() -> str | None:
             if found:
                 return found
     return None
+
+
+# 我们自动加过的 SSH 白名单都带这个描述（含改名前的 vpnctl 那批）。
+# 只认这个标记，绝不碰别人手工加的规则。
+_SSH_RULE_MARKER = "SSH from admin"
+
+
+def _prune_ssh_rules(ecs, group_id: str, keep_cidr: str) -> list[str]:
+    """删掉以前自动加过、现在已经过期的 SSH 白名单，返回被删掉的地址。
+
+    为什么需要：移动的公网 IP 会变，每次 `up` 都加一条，久了白名单会攒一堆
+    根本不再使用的 /32 —— 既是噪音，也是白白敞着的入口。
+    只删带我们自己标记的规则；用户手工加的、别的用途的，一律不碰。
+    """
+    removed: list[str] = []
+    for rule in ecs.security_group_rules(group_id, "ingress"):
+        if str(rule.get("PortRange") or "") != "22/22":
+            continue
+        if _SSH_RULE_MARKER not in str(rule.get("Description") or ""):
+            continue
+        cidr = str(rule.get("SourceCidrIp") or "")
+        if not cidr or cidr == keep_cidr:
+            continue
+        try:
+            ecs.revoke_ingress(group_id, "tcp", "22/22", cidr)
+        except AliyunError as exc:
+            log.warning("清理过期 SSH 白名单 %s 失败（不影响本次创建）: %s", cidr, exc)
+            continue
+        removed.append(cidr)
+    if removed:
+        log.info("清理了 %d 条过期的 SSH 白名单：%s", len(removed), "、".join(removed))
+    return removed
 
 
 def _normalize_cidr(value: str) -> str:
@@ -569,6 +613,10 @@ def _resolve_security_group(
         if not ecs.ensure_ingress(existing, "tcp", port_range, "0.0.0.0/0", "yi VLESS/REALITY"):
             log.info("安全组 %s 已满足要求", existing)
         ecs.ensure_ingress(existing, "tcp", "22/22", ssh_from, "yi SSH from admin")
+        # 顺手清掉以前自动加过、现在已经过期的白名单（IP 变了就会攒一堆）。
+        # 只在 ssh_from 是具体地址时做：用户明确写了 0.0.0.0/0 就别动他的配置。
+        if str(ssh_from).endswith("/32"):
+            _prune_ssh_rules(ecs, existing, str(ssh_from))
         return existing, False
 
     group_id = ecs.create_security_group(

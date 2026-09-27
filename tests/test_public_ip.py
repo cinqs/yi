@@ -28,7 +28,11 @@ class Response(io.BytesIO):
 
 
 def responder(mapping, failures=()):
-    """urlopen stand-in: `failures` are URLs that raise, mapping gives bodies."""
+    """opener stand-in: `failures` are URLs that raise, mapping gives bodies.
+
+    打成 cli._NO_PROXY_OPENER.open —— 探测必须绕开系统代理（见 cli 里的注释），
+    用 urlopen 的默认 opener 打桩就测不到真正跑的那条路径了。
+    """
 
     def fake(request, timeout=None):
         url = getattr(request, "full_url", request)
@@ -68,13 +72,13 @@ class DetectionTests(unittest.TestCase):
         mapping = {
             cli.IP_ECHO_URLS[0]: "当前 IP：47.52.1.2  来自于：中国 广东 电信",
         }
-        with mock.patch.object(cli.urllib.request, "urlopen", responder(mapping)):
+        with mock.patch.object(cli._NO_PROXY_OPENER, "open", responder(mapping)):
             self.assertEqual(cli._my_public_ip(), "47.52.1.2")
 
     def test_skips_the_blocked_one_and_still_succeeds(self):
         blocked = cli.IP_ECHO_URLS[0]
         mapping = {cli.IP_ECHO_URLS[1]: "47.52.1.9"}
-        with mock.patch.object(cli.urllib.request, "urlopen", responder(mapping, failures={blocked})):
+        with mock.patch.object(cli._NO_PROXY_OPENER, "open", responder(mapping, failures={blocked})):
             self.assertEqual(cli._my_public_ip(), "47.52.1.9")
 
     def test_unparseable_response_moves_on(self):
@@ -82,11 +86,11 @@ class DetectionTests(unittest.TestCase):
             cli.IP_ECHO_URLS[0]: "<html>error</html>",
             cli.IP_ECHO_URLS[1]: "47.52.1.11",
         }
-        with mock.patch.object(cli.urllib.request, "urlopen", responder(mapping)):
+        with mock.patch.object(cli._NO_PROXY_OPENER, "open", responder(mapping)):
             self.assertEqual(cli._my_public_ip(), "47.52.1.11")
 
     def test_everything_failing_falls_back_to_dns_then_returns_none(self):
-        with mock.patch.object(cli.urllib.request, "urlopen", responder({}, failures=set(cli.IP_ECHO_URLS))):
+        with mock.patch.object(cli._NO_PROXY_OPENER, "open", responder({}, failures=set(cli.IP_ECHO_URLS))):
             with mock.patch.object(cli, "_public_ip_via_dns", return_value="47.52.1.99"):
                 self.assertEqual(cli._my_public_ip(), "47.52.1.99")
             with mock.patch.object(cli, "_public_ip_via_dns", return_value=None):

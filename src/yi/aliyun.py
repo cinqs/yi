@@ -496,6 +496,30 @@ class EcsClient(RpcClient):
             Description="yi allow all egress",
         )
 
+    def revoke_ingress(
+        self,
+        group_id: str,
+        ip_protocol: str,
+        port_range: str,
+        source_cidr: str,
+    ) -> None:
+        """撤销一条入方向规则。
+
+        用「协议 + 端口 + 源地址」这套老写法，不用 `SecurityGroupRuleId`：
+        实测只给 RuleId 会被拒——
+        `InvalidIpProtocol.ValueNotSupported: The parameter IpProtocol must be
+        specified with ... TCP, UDP, ICMP, GRE or All`。既然本来就知道这三项，
+        一起传最省事，也和 `authorize()` 对称。
+        """
+        self.call(
+            "RevokeSecurityGroup",
+            RegionId=self.region,
+            SecurityGroupId=group_id,
+            IpProtocol=ip_protocol,
+            PortRange=port_range,
+            SourceCidrIp=source_cidr,
+        )
+
     def delete_security_group(self, group_id: str) -> None:
         self.call("DeleteSecurityGroup", RegionId=self.region, SecurityGroupId=group_id)
 
