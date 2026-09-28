@@ -1585,14 +1585,24 @@ def _tcp_check(host: str, port: int, timeout: float = 5.0) -> bool:
         return False
 
 
+# 「连续查不到几次了」必须**跨调用保持**。
+#
+# 踩过的坑：它原本是 `cmd_watch()` 里的局部变量，而 App 的守护进程是按
+# `once=True` 一轮一轮调用的 —— 每轮都从 0 重新开始，于是永远到不了
+# "连续 2 次才动手"的门槛，**「自动重建」一次都没触发过**。机器被回收之后
+# 界面就一直停在"已回收"，用户只能自己点重建。
+#
+# 键是实例 ID：换了新实例之后计数自然从 0 起算。
+_watch_misses: dict[str, int] = {}
+
+
 def cmd_watch(args) -> int:
     config = state.load_config()
-    missing = 0
     while True:
         current = state.load_state()
         if not current or not current.get("instance_id"):
             log.info("没有实例记录，执行 up")
-            missing = 0
+            _watch_misses.clear()
             _recreate_safely(config, args)
         else:
             ecs = _client(config, current.get("region"))
@@ -1614,15 +1624,16 @@ def cmd_watch(args) -> int:
             if not reachable:
                 pass
             elif present is None:
-                missing += 1
+                missing = _watch_misses.get(instance_id, 0) + 1
+                _watch_misses[instance_id] = missing
                 log.warning("第 %d 次查不到实例 %s（可能是竞价回收）", missing, instance_id)
                 # 连续两次都查不到才动手，避免单次 API 抖动导致误重建
                 if missing >= 2:
                     log.warning("连续 %d 次查不到，判定已被回收，开始重建", missing)
-                    missing = 0
+                    _watch_misses.pop(instance_id, None)
                     _recreate_safely(config, args)
             else:
-                missing = 0
+                _watch_misses.pop(instance_id, None)
                 log.info("实例 %s 状态 %s，正常", instance_id, present.get("Status"))
                 _budget_guard(config, current)
         if args.once:

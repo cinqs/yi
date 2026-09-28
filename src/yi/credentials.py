@@ -32,7 +32,7 @@ def config_path(home: str | None = None) -> str:
 
 
 def mask(access_key_id: str | None) -> str:
-    """`LTAI5tXXXXXXXPsF1` → `LTAI****PsF1`。
+    """`LTAIEXAMPLEKEY0000PSF1` → `LTAI****PSF1`。
 
     日志里一直是这个写法（`使用 AccessKey LTAI****PsF1（来自 env）`），
     界面上也保持一样，用户一眼能把两处对上。

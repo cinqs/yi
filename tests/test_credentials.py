@@ -26,7 +26,7 @@ ENV_KEYS = [k for pair in credentials.ENV_VARS for k in pair]
 
 class MaskTests(unittest.TestCase):
     def test_masks_the_middle(self):
-        self.assertEqual(credentials.mask("LTAI5tAbCdEfGhIjKlPsF1"), "LTAI****PsF1")
+        self.assertEqual(credentials.mask("LTAIEXAMPLEKEY0000PSF1"), "LTAI****PSF1")
 
     def test_short_values_are_fully_hidden(self):
         self.assertEqual(credentials.mask("abc"), "***")
@@ -52,23 +52,23 @@ class DescribeTests(unittest.TestCase):
         self.assertIn("还没有配置文件", info["source_label"])
 
     def test_reads_and_masks_the_file(self):
-        path = credentials.save("LTAI5tAbCdEfGhIjKlPsF1", "s3cret", home=self.home.name)
+        path = credentials.save("LTAIEXAMPLEKEY0000PSF1", "s3cret", home=self.home.name)
         info = credentials.describe(home=self.home.name)
         self.assertTrue(info["configured"])
-        self.assertEqual(info["access_key_id"], "LTAI****PsF1")
+        self.assertEqual(info["access_key_id"], "LTAI****PSF1")
         self.assertIn(path, info["source_label"])
 
     def test_never_returns_the_secret(self):
-        credentials.save("LTAI5tAbCdEfGhIjKlPsF1", "super-secret-value", home=self.home.name)
+        credentials.save("LTAIEXAMPLEKEY0000PSF1", "super-secret-value", home=self.home.name)
         blob = json.dumps(credentials.describe(home=self.home.name))
         self.assertNotIn("super-secret-value", blob)
 
     def test_env_wins_and_says_so(self):
         """环境变量优先 —— 不把这个说清楚，用户会以为"我改了文件怎么没用"。"""
-        credentials.save("LTAI5tAbCdEfGhIjKlPsF1", "file-secret", home=self.home.name)
+        credentials.save("LTAIEXAMPLEKEY0000PSF1", "file-secret", home=self.home.name)
         with mock.patch.dict(
             os.environ,
-            {"ALIBABA_CLOUD_ACCESS_KEY_ID": "LTAI5tEnvKey9999", "ALIBABA_CLOUD_ACCESS_KEY_SECRET": "x"},
+            {"ALIBABA_CLOUD_ACCESS_KEY_ID": "LTAIEXAMPLEENV0009999", "ALIBABA_CLOUD_ACCESS_KEY_SECRET": "x"},
         ):
             info = credentials.describe(home=self.home.name)
         self.assertTrue(info["env_override"])
@@ -83,16 +83,16 @@ class SaveTests(unittest.TestCase):
         self.addCleanup(self.home.cleanup)
 
     def test_writes_0600_and_round_trips_through_the_loader(self):
-        path = credentials.save("LTAI5tAbCdEfGhIjKlPsF1", "s3cret", home=self.home.name)
+        path = credentials.save("LTAIEXAMPLEKEY0000PSF1", "s3cret", home=self.home.name)
         self.assertEqual(oct(os.stat(path).st_mode & 0o777), "0o600")
         creds = aliyun.load_credentials("default", home=self.home.name)
-        self.assertEqual(creds.access_key_id, "LTAI5tAbCdEfGhIjKlPsF1")
+        self.assertEqual(creds.access_key_id, "LTAIEXAMPLEKEY0000PSF1")
         self.assertEqual(creds.access_key_secret, "s3cret")
 
     def test_keeps_other_profiles(self):
         """用户可能还有别的账号配在同一个文件里，只动我们这一条。"""
-        path = credentials.save("LTAI5tOther1111", "other", profile="other", home=self.home.name)
-        credentials.save("LTAI5tAbCdEfGhIjKlPsF1", "s3cret", profile="yi", home=self.home.name)
+        path = credentials.save("LTAIEXAMPLEOTHER0011", "other", profile="other", home=self.home.name)
+        credentials.save("LTAIEXAMPLEKEY0000PSF1", "s3cret", profile="yi", home=self.home.name)
         with open(path, encoding="utf-8") as handle:
             data = json.load(handle)
         names = {p["name"] for p in data["profiles"]}
@@ -102,15 +102,15 @@ class SaveTests(unittest.TestCase):
     def test_resaving_the_same_profile_replaces_it(self):
         home = self.home.name
         profile = credentials.describe(home=home)["profile"]
-        credentials.save("LTAI5tAbCdEfGhIjKlPsF1", "first", profile=profile, home=home)
-        credentials.save("LTAI5tAbCdEfGhIjKlPsF1", "second", profile=profile, home=home)
+        credentials.save("LTAIEXAMPLEKEY0000PSF1", "first", profile=profile, home=home)
+        credentials.save("LTAIEXAMPLEKEY0000PSF1", "second", profile=profile, home=home)
         with open(credentials.config_path(home), encoding="utf-8") as handle:
             profiles = json.load(handle)["profiles"]
         self.assertEqual(len(profiles), 1)
         self.assertEqual(profiles[0]["access_key_secret"], "second")
 
     def test_rejects_empty_or_obviously_wrong_input(self):
-        for bad in (("", "s"), ("LTAI5tAbCdEfGhIjKlPsF1", ""), ("nope", "s")):
+        for bad in (("", "s"), ("LTAIEXAMPLEKEY0000PSF1", ""), ("nope", "s")):
             with self.subTest(bad=bad):
                 with self.assertRaises(ValueError):
                     credentials.save(*bad, home=self.home.name)
@@ -122,10 +122,10 @@ class VerifyBeforeSaveTests(unittest.TestCase):
     def test_verify_calls_describe_regions_with_the_supplied_key(self):
         with mock.patch.object(aliyun, "EcsClient") as client:
             client.return_value.describe_regions.return_value = ["cn-hongkong"]
-            regions = credentials.verify("LTAI5tAbCdEfGhIjKlPsF1", "s", "cn-hongkong")
+            regions = credentials.verify("LTAIEXAMPLEKEY0000PSF1", "s", "cn-hongkong")
         self.assertEqual(regions, ["cn-hongkong"])
         passed = client.call_args[0][0]
-        self.assertEqual(passed.access_key_id, "LTAI5tAbCdEfGhIjKlPsF1")
+        self.assertEqual(passed.access_key_id, "LTAIEXAMPLEKEY0000PSF1")
         self.assertEqual(passed.access_key_secret, "s")
 
     def test_verify_propagates_a_bad_key_instead_of_swallowing_it(self):
@@ -134,7 +134,7 @@ class VerifyBeforeSaveTests(unittest.TestCase):
                 "InvalidAccessKeyId.NotFound", "no"
             )
             with self.assertRaises(aliyun.AliyunError):
-                credentials.verify("LTAI5tAbCdEfGhIjKlPsF1", "s")
+                credentials.verify("LTAIEXAMPLEKEY0000PSF1", "s")
 
 
 if __name__ == "__main__":
