@@ -167,6 +167,14 @@ def snapshot(
             "domain": config.get("domain"),
             "subdomain": config.get("subdomain"),
             "mixed_port": config.get("mixed_port") or proxy.DEFAULT_MIXED_PORT,
+            # 这几个是"复用你自己的云资源"的入口。留空 = 自动发现 / 自动创建，
+            # 所以界面上必须能让用户看到当前值、也得能改 —— 只给 CLI 的话，
+            # 用 App 的人根本不知道它们存在。
+            "vswitch_id": config.get("vswitch_id") or "",
+            "security_group_id": config.get("security_group_id") or "",
+            "key_pair_name": config.get("key_pair_name") or "",
+            "instance_name": config.get("instance_name") or "",
+            "allow_ssh_from": config.get("allow_ssh_from") or "auto",
         },
     }
 

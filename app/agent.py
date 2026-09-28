@@ -52,7 +52,8 @@ _PACKAGE_ROOT = _locate_package_root()
 if _PACKAGE_ROOT:
     sys.path.insert(0, _PACKAGE_ROOT)
 
-from yi import __version__, proxy, rules, state, status  # noqa: E402
+from yi import __version__, credentials, proxy, rules, state, status  # noqa: E402
+from yi.aliyun import AliyunError  # noqa: E402
 from yi.cli import (  # noqa: E402
     cmd_connect,
     cmd_disconnect,
@@ -539,6 +540,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(build_state())
         elif route == "/api/rules":
             self._json(rules_snapshot())
+        elif route == "/api/credentials":
+            self._json(credentials.describe())
         elif route == "/icon.png":
             # 界面标题栏用同一枚图标（和 App 图标保持一套视觉）
             for name in ("icon-256.png", "icon-512.png", "icon-1024.png"):
@@ -579,6 +582,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/rules/custom": self._rules_add,
                 "/api/rules/custom/delete": self._rules_delete,
                 "/api/rules/community/update": self._rules_update,
+                "/api/credentials": self._credentials_save,
             }.get(route)
             if handler is None:
                 self._json({"error": "not found"}, 404)
@@ -670,6 +674,29 @@ class Handler(BaseHTTPRequestHandler):
         RUNTIME.run("rules", lambda: cmd_rules(args))
         self._json({"ok": True})
 
+    # ── 凭据 ────────────────────────────────────────────────────────────
+    def _credentials_save(self, payload: dict[str, Any]) -> None:
+        """保存 AccessKey。**先真调一次接口验证，通过了才落盘。**
+
+        只写不验的话，写错的密钥要等到下次 `up` 才炸 —— 那时已经花掉几分钟
+        和一次实例创建。密钥本身只进不出：接口从来不把它回传给界面。
+        """
+        key_id = str(payload.get("access_key_id") or "")
+        secret = str(payload.get("access_key_secret") or "")
+        profile = str(payload.get("profile") or credentials.DEFAULT_PROFILE)
+        region = state.load_config().get("region") or "cn-hongkong"
+        try:
+            regions = credentials.verify(key_id, secret, region)
+            path = credentials.save(key_id, secret, profile)
+        except (ValueError, AliyunError) as exc:
+            hint = exc.hint() if hasattr(exc, "hint") else str(exc)
+            self._json({"ok": False, "error": f"{hint}"}, 400)
+            return
+        logging.getLogger("yi.app").info(
+            "AccessKey 已更新并验证通过（profile=%s，可见 %d 个区域）", profile, len(regions)
+        )
+        self._json({"ok": True, "credentials": credentials.describe(profile), "path": path})
+
     def _serve_sub_qr(self) -> None:
         """手机订阅二维码。装了 qrcode 才提供，没有就让界面显示纯文本地址。"""
         try:
@@ -734,6 +761,13 @@ def _update_config(payload: dict[str, Any]) -> dict[str, Any]:
         "xray_version",
         "domain",
         "subdomain",
+        # 复用用户自己的云资源 / 命名
+        "vswitch_id",
+        "security_group_id",
+        "key_pair_name",
+        "instance_name",
+        "allow_ssh_from",
+        "region",
     }
     config = state.load_config()
     for key, value in (payload or {}).items():

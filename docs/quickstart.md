@@ -48,6 +48,9 @@ make setup                   # uv + Python 3.12 + 虚拟环境
 
 AccessKey 只会写到 `~/.aliyun/config.json`（权限 600），**不会进入本项目的任何文件**。
 
+> 也可以直接用 App：打开 `dist/Yi.app` →「设置」→「阿里云凭据」填进去，
+> 它会先验证再保存，界面里只会显示 `LTAI****PsF1` 这样的掩码。
+
 ## 2. 先体检（这一步不花钱）
 
 ```bash

@@ -613,6 +613,67 @@
 
   <section id="tab-settings" class="hide">
     <div class="card">
+      <span class="micro">阿里云凭据</span>
+      <div class="row">
+        <span class="k">当前</span>
+        <span class="v mono" id="ak-status">读取中…</span>
+      </div>
+      <p class="hint" style="margin:10px 0 2px" id="ak-hint"></p>
+      <!-- 用 <form> 包起来：① 浏览器不会再抱怨"密码框不在表单里"；
+           ② 顺手让回车等于点保存。onsubmit 拦掉，免得整页刷新。 -->
+      <form class="form" id="ak-form" autocomplete="off">
+        <div class="field wide">
+          <label class="micro">AccessKey ID</label>
+          <input type="text" id="ak-id" placeholder="LTAI…" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field wide">
+          <label class="micro">AccessKey Secret · 只写不读，保存后不会回显</label>
+          <input type="password" id="ak-secret" placeholder="留空则不改动" autocomplete="new-password">
+        </div>
+      </form>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="btn" id="btn-ak-save"><svg><use href="#i-check"/></svg>保存并验证</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="micro">网络资源</span>
+      <p class="hint" style="margin:8px 0 2px">
+        <b>留空就是自动</b>：交换机留空会去找默认 VPC 的交换机，安全组留空会自动建一个。
+        填上你已有的 ID 就复用它 —— 这类资源属于你的资产，<b>yi 永远不会删</b>。
+      </p>
+      <div class="form">
+        <div class="field">
+          <label class="micro">地域</label>
+          <input type="text" id="cfg-region" placeholder="cn-hongkong">
+        </div>
+        <div class="field">
+          <label class="micro">密钥对名</label>
+          <input type="text" id="cfg-keypair" placeholder="yi">
+        </div>
+        <div class="field">
+          <label class="micro">交换机 ID · 留空自动发现</label>
+          <input type="text" id="cfg-vswitch" placeholder="vsw-…" spellcheck="false">
+        </div>
+        <div class="field">
+          <label class="micro">安全组 ID · 留空自动创建</label>
+          <input type="text" id="cfg-sg" placeholder="sg-…" spellcheck="false">
+        </div>
+        <div class="field">
+          <label class="micro">实例名前缀</label>
+          <input type="text" id="cfg-name" placeholder="yi-hk">
+        </div>
+        <div class="field">
+          <label class="micro">SSH 来源 · auto 跟随本机公网 IP</label>
+          <input type="text" id="cfg-sshfrom" placeholder="auto">
+        </div>
+      </div>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="btn" id="btn-net-save"><svg><use href="#i-check"/></svg>保存</button>
+      </div>
+    </div>
+
+    <div class="card">
       <span class="micro">购买参数</span>
       <div class="form">
         <div class="field wide">
@@ -682,6 +743,7 @@ const need = (id) => document.getElementById(id) ||
 const icon = (name) => `<svg viewBox="0 0 24 24"><use href="#${name}"/></svg>`;
 
 let lastState = null;
+let activeTab = "connect";
 let refreshing = false;
 let fetchFailures = 0;
 let stageState = {};
@@ -981,6 +1043,34 @@ function render(s) {
     need("cfg-port").value = c.xray_port ?? 443;
     need("cfg-xray").value = c.xray_version ?? "latest";
     need("cfg-gb").value = (c.budget || {}).max_gb ?? 300;
+    need("cfg-region").value = c.region || "cn-hongkong";
+    need("cfg-keypair").value = c.key_pair_name || "yi";
+    need("cfg-vswitch").value = c.vswitch_id || "";
+    need("cfg-sg").value = c.security_group_id || "";
+    need("cfg-name").value = c.instance_name || "yi-hk";
+    need("cfg-sshfrom").value = c.allow_ssh_from || "auto";
+  }
+  if (activeTab === "settings") loadCredentials();
+}
+
+let credsLoaded = false;
+async function loadCredentials(force) {
+  if (credsLoaded && !force) return;
+  try {
+    const r = await fetch("/api/credentials?t=" + Date.now());
+    const d = await r.json();
+    credsLoaded = true;
+    const st = need("ak-status");
+    st.textContent = d.configured ? d.access_key_id : "未配置";
+    st.style.color = d.configured ? "var(--brand)" : "var(--warn)";
+    need("ak-hint").textContent = d.configured
+      ? `来源：${d.source_label}` + (d.env_override
+          ? "　⚠️ 环境变量优先级更高，写文件不会生效" : "")
+      : `还没有凭据。填下面两项保存即可（写进 ~/.aliyun/config.json，权限 600）。`;
+    // 密钥永不回显，ID 也不预填：避免"以为改过了"其实只是原值
+    if (!d.configured) return;
+  } catch (e) {
+    need("ak-status").textContent = "读取失败";
   }
 }
 
@@ -1103,8 +1193,10 @@ document.querySelectorAll("nav button").forEach((btn) => {
       need("tab-" + tab).classList.toggle("hide", tab !== btn.dataset.tab));
     need("tab-" + btn.dataset.tab).classList.add("fadein");
     setTimeout(() => need("tab-" + btn.dataset.tab).classList.remove("fadein"), 320);
+    activeTab = btn.dataset.tab;
     // 规则页不在 SSE 状态里推（它不是"机器状态"），打开时现取一次
     if (btn.dataset.tab === "rules") loadRules();
+    if (btn.dataset.tab === "settings") loadCredentials();
   };
 });
 
@@ -1171,6 +1263,49 @@ need("btn-save").onclick = () => post("/api/config", {
   xray_version: need("cfg-xray").value.trim() || "latest",
   budget: { max_gb: parseInt(need("cfg-gb").value, 10) || 300 },
 }, "设置已保存");
+need("btn-net-save").onclick = () => post("/api/config", {
+  region: need("cfg-region").value.trim() || "cn-hongkong",
+  key_pair_name: need("cfg-keypair").value.trim() || "yi",
+  vswitch_id: need("cfg-vswitch").value.trim(),
+  security_group_id: need("cfg-sg").value.trim(),
+  instance_name: need("cfg-name").value.trim() || "yi-hk",
+  allow_ssh_from: need("cfg-sshfrom").value.trim() || "auto",
+}, "网络资源已保存");
+
+need("btn-ak-save").onclick = async () => {
+  const id = need("ak-id").value.trim();
+  const secret = need("ak-secret").value.trim();
+  if (!id && !secret) { toast("要改就两项都填（密钥不回显，必须整体重填）", "err"); return; }
+  if (!id || !secret) { toast("AccessKey ID 和 Secret 要一起填", "err"); return; }
+  const btn = need("btn-ak-save");
+  btn.disabled = true;
+  btn.textContent = "验证中…";
+  try {
+    const r = await fetch("/api/credentials", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ access_key_id: id, access_key_secret: secret }),
+    });
+    const v = await r.json();
+    if (!v.ok) { toast(v.error || "验证失败", "err"); return; }
+    need("ak-id").value = "";
+    need("ak-secret").value = "";
+    credsLoaded = false;
+    await loadCredentials(true);
+    toast("凭据已验证并保存", "ok");
+  } catch (e) {
+    toast("保存失败：" + e.message, "err");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg><use href="#i-check"/></svg>保存并验证';
+  }
+};
+
+// 回车 = 点保存（表单默认行为是刷新整页，得拦掉）
+need("ak-form").onsubmit = (e) => {
+  e.preventDefault();
+  need("btn-ak-save").click();
+};
+
 need("btn-reset-hint").onclick = () => {
   need("cfg-types").value = "ecs.e-c1m1.large, ecs.t6-c1m1.large, ecs.u1-c1m1.large";
   need("cfg-zones").value = "cn-hongkong-b, cn-hongkong-c, cn-hongkong-d";
